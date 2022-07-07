@@ -64,7 +64,6 @@ def start_ray(conn, address):
 
     try:
         conn.run('ray stop -f', hide=True)
-        # run_command_on_tpu("ray stop -f")
     except:
         pass
     
