@@ -1,4 +1,13 @@
-# bloom-inference-jax
+# BLOOM 🌸 Inference in JAX
+
+## Structure
+CPU Host: as defined in TPU manager
+
+TPU Host: as defined in Host worker
+
+`ray`: distributes load from CPU host -> TPU hosts
+
+Example usage: `run.py`
 
 ## Setting Up a TPU-Manager
 The TPU hosts are managed by a single TPU manager. This TPU manager takes the form of a single CPU device.
