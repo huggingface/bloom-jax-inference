@@ -1,4 +1,5 @@
 import functools
+import time
 from multiprocessing import pool
 
 import ray
@@ -23,6 +24,15 @@ with pool.ThreadPool(processes=len(conns)) as p:
 
 t = TPUManager((tpu_size // cores_per_replica, cores_per_replica), len(conns))
 
-t.generate(4*['the cat sat on the mat'])
+# benchmark compile step
+start = time.time()
+t.generate(4*['the cat sat on the'])
+print(f"Generations completed in ***REMOVED***time.time() - start:.06***REMOVED***s")
 
-t.generate(4*['the cat sat on the mat'])
+# benchmark generate
+start = time.time()
+t.generate(4*['the cat sat on the'])
+print(f"Generations completed in ***REMOVED***time.time() - start:.06***REMOVED***s")
+
+conns.run("ray stop -f")
+ray.shutdown()
