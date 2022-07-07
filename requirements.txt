@@ -1,0 +1,6 @@
+ray==1.13.0
+aiohttp==3.7
+fabric
+dataclasses
+func_timeout
+numpy
