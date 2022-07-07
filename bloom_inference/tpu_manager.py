@@ -27,11 +27,10 @@ class TPUManager:
 
     # @func_set_timeout(600)
     def generate(self, context):
-        start = time.time()
         #context = np.array_split(context, len(self.nodes), axis=0)
         res = []
 
         for n, ctx in zip(self.nodes, context):
             res.append(n.generate.remote(ctx))
 
-        return [i for i in ray.get(res)], f"Generations completed in {time.time() - start:.06}s"
+        return [i for i in ray.get(res)]

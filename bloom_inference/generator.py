@@ -27,7 +27,7 @@ def head_print(*args, **kwargs):
         print(*args, **kwargs)
 
 class Generator:
-    def __init__(self, mesh_shape, ckpt="sanchit-gandhi/bloom-350m-scan"):
+    def __init__(self, mesh_shape, ckpt="bigscience/bloom-6b3"):
         # create a mesh and bind names to mesh axes
         self.mesh_shape = mesh_shape
         self.devices = np.array(jax.devices()).reshape(self.mesh_shape)
@@ -36,13 +36,13 @@ class Generator:
 
     def load_model_and_params(self):
         # TODO loading params should be done in a thread
-        model, self.params = FlaxBloomForCausalLM.from_pretrained("sanchit-gandhi/bloom-350m-scan", _do_init=False, use_scan=True)
+        model, self.params = FlaxBloomForCausalLM.from_pretrained(self.ckpt, _do_init=False, use_scan=False)
         self.spec = set_partitions(model.params_shape_tree)
 
-        tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m")
+        tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
         # setup for generation
         tokenizer.padding_sided = "left"
-        model.config.max_length = 256
+        model.config.max_length = 64
         model.config.num_beams = 1
         model.config.do_sample = True
 
@@ -66,7 +66,7 @@ class Generator:
             self.params = self.p_shard_params(freeze(self.params))
 
     def generate(self, prompts):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=64) # BS = 8
+        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=16) # BS = 4
         with maps.Mesh(self.devices, ("dp", "mp")):
             gen_ids = self.p_generate(freeze(self.params), inputs["input_ids"], inputs["attention_mask"])
 

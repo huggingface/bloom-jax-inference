@@ -1,5 +1,3 @@
-# copied from https://github.com/kingoflolz/mesh-trzansformer-jax
-
 import functools
 import os
 import subprocess
