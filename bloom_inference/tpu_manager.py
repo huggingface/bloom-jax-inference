@@ -1,7 +1,6 @@
 import time
 import ray
-
-
+import numpy as np
 
 class TPUManager:
     # @func_set_timeout(1200)
@@ -28,15 +27,11 @@ class TPUManager:
 
     # @func_set_timeout(600)
     def generate(self, context):
-        # context = np.array_split(context, len(self.nodes), axis=0)
+        start = time.time()
+        #context = np.array_split(context, len(self.nodes), axis=0)
         res = []
-        # for n, ctx in zip(self.nodes, context):
-        #     res.append(n.generate.remote(ctx))
-
-        # inputs = tokenizer(prompts, return_tensors="np", padding="max_length", truncation=True, max_length=32)
-        # inputs["input_ids"] =
 
         for n, ctx in zip(self.nodes, context):
             res.append(n.generate.remote(ctx))
 
-        return [i for i in ray.get(res)]
+        return [i for i in ray.get(res)], f"Generations completed in {time.time() - start:.06}s"

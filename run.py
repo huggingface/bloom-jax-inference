@@ -22,3 +22,7 @@ with pool.ThreadPool(processes=len(conns)) as p:
     p.map(functools.partial(start_ray, address=address), conns)
 
 t = TPUManager((tpu_size // cores_per_replica, cores_per_replica), len(conns))
+
+t.generate(4*['the cat sat on the mat'])
+
+t.generate(4*['the cat sat on the mat'])
