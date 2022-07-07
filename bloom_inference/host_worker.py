@@ -2,7 +2,6 @@
 
 import ray
 import time
-import numpy as np
 from queue import Queue
 
 
