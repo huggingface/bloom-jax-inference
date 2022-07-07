@@ -32,24 +32,12 @@ class Generator:
     def __init__(self, mesh_shape, ckpt="EleutherAI/gpt-j-6B"):
         # create a mesh and bind names to mesh axses
         self.mesh_shape = mesh_shape
-        devices = np.array(jax.devices()).reshape(self.mesh_shape)
-        self.mesh = maps.Mesh(devices, ("dp", "mp"))
+        self.devices = np.array(jax.devices()).reshape(self.mesh_shape)
+        # self.mesh = maps.Mesh(devices, ("dp", "mp"))
 
         # load the model and params
         # self.load_model_and_params()
 
-        self.shard_params = pjit(
-            self.model.to_bf16,
-            in_axis_resources=(self.spec,),
-            out_axis_resources=self.spec,
-        )
-
-        def generate(params, input_ids, attention_mask):
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
-            return output_ids
-        
-        self.p_generate = pjit(generate, in_axis_resources=(self.spec, P("dp"), P("dp")), out_axis_resources=P("dp"))
-    
     def load_model_and_params(self):
         # TODO loading params should be done in a thread
         model, self.params = FlaxGPTJForCausalLM.from_pretrained("EleutherAI/gpt-j-6B", _do_init=False)
@@ -62,19 +50,30 @@ class Generator:
         model.config.max_length = 128
         model.config.num_beams = 1
         model.config.do_sample = True
-        model.config.pad_token_id = tokenizer.pad_token
+        model.config.pad_token_id = tokenizer.pad_token_id
 
         self.model = model
         self.tokenizer = tokenizer
 
+        self.p_shard_params = pjit(
+            self.model.to_bf16,
+            in_axis_resources=(self.spec,),
+            out_axis_resources=self.spec,
+        )
+
+        def generate(params, input_ids, attention_mask):
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
+            return output_ids
+        
+        self.p_generate = pjit(generate, in_axis_resources=(self.spec, P("dp"), P("dp")), out_axis_resources=P("dp"))
+
     def shard_params(self):
-        with self.mesh:
-            self.params = self.shard_params(self.params)
+        with maps.Mesh(self.devices, ("dp", "mp")):
+            self.params = self.p_shard_params(freeze(self.params))
 
     def generate(self, prompts):
         inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=32) # BS = 8
-        
-        with self.mesh:
+        with maps.Mesh(self.devices, ("dp", "mp")):
             gen_ids = self.p_generate(freeze(self.params), inputs["input_ids"], inputs["attention_mask"])
 
         generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
