@@ -4,12 +4,6 @@ set -e
 # this locks the python executable down to hopefully stop if from being fiddled with...
 screen -d -m python -c "import time; time.sleep(999999999)"
 
-# testing... remove venv each time
-rm -rf venv
-
-# clear cache -> currently limited to 100 GB storage
-rm -rf ~/.cache
-
 # check if venv exists
 if [ -d ~/venv]
 then

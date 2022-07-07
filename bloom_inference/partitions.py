@@ -36,17 +36,21 @@ def _replacement_rules(rules):
 def _get_partition_rules():
     return [
         # Embeddings
-        (("transformer", "wte", "embedding"), P("mp", None)),
+        (("word_embeddings", "embedding"), P(None, "mp")),
         # Attention
-        ((r"attn", "(q_proj|k_proj|v_proj)", "kernel"), P(None, "mp")),
-        ((r"attn", "out_proj", "kernel"), P("mp", None)),
+        ((r"self_attention", "query_key_value", "kernel"), P("mp", None)),
+        ((r"self_attention", "query_key_value", "bias"), P(None)),
+        ((r"self_attention", "dense", "kernel"), P(None, "mp")),
+        ((r"self_attention", "dense", "kernel"), P("mp")),
         # FFN
-        ((r"mlp", "fc_in", "kernel"), P(None, "mp")),
-        ((r"mlp", "fc_out", "kernel"), P("mp", None)),
+        ((r"mlp", "dense_4h_to_h", "kernel"), P("mp", None)),
+        ((r"mlp", "dense_4h_to_h", "bias"), P(None)),
+        ((r"mlp", "dense_h_to_4h", "kernel"), P(None, "mp")),
+        ((r"mlp", "dense_h_to_4h", "bias"), P("mp")),
         # layer norms
         (("(bias|scale)",), None),
         # projection
-        (("lm_head", "kernel"), P(None, "mp")),
+        # (("lm_head", "kernel"), P(None, "mp")),
     ]
 
 
