@@ -8,7 +8,6 @@ import time
 import glob
 import requests
 from fabric import Connection
-from invoke import run
 
 
 @functools.lru_cache()
