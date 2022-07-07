@@ -8,6 +8,7 @@ import time
 import glob
 import requests
 from fabric import Connection
+from invoke import run
 
 
 @functools.lru_cache()
@@ -23,14 +24,14 @@ def get_project():
 
 def copy_files_on_tpu(path, dest, is_dir=False):
     if is_dir:
-        command = f"gcloud compute tpus tpu-vm scp --recurse ***REMOVED***path***REMOVED*** suraj-tpu-v3-32:***REMOVED***dest***REMOVED*** --worker=all --zone=europe-west4-a"
+        command = f"gcloud compute tpus tpu-vm scp --recurse ***REMOVED***path***REMOVED*** suraj-tpu-v3-32:***REMOVED***dest***REMOVED*** --quiet --force-key-file-overwrite --strict-host-key-checking=no --worker=all --zone=europe-west4-a"
     else:
         command = f"gcloud compute tpus tpu-vm scp ***REMOVED***path***REMOVED*** suraj-tpu-v3-32:***REMOVED***dest***REMOVED*** --worker=all --zone=europe-west4-a"
     
     return subprocess.check_output(command, shell=True).decode("utf-8").strip()
 
 def run_command_on_tpu(command):
-    command = f"gcloud compute tpus tpu-vm ssh suraj-tpu-v3-32 --zone=europe-west4-a --worker=all --command='***REMOVED***command***REMOVED***'"
+    command = f"gcloud compute tpus tpu-vm ssh suraj-tpu-v3-32 --zone=europe-west4-a --quiet --force-key-file-overwrite --strict-host-key-checking=no --worker=0 --command='***REMOVED***command***REMOVED***'"
     return subprocess.check_output(command, shell=True).decode("utf-8").strip()
 
 
@@ -151,36 +152,35 @@ def get_connection(
 
 
 def start_ray(conn, address):
-    # conn.sudo('rm -rf *.py')
-    # conn.sudo('rm -rf mesh_transformer')
-    run_command_on_tpu("sudo rm -rf *.py bloom-inference")
+    conn.run('sudo rm -rf *.py bloom_inference')
+    # run_command_on_tpu("sudo rm -rf *.py bloom_inference")
 
-    # for i in glob.glob("*.py"):
-    #     conn.put(i, "")
+    conn.run("mkdir bloom_inference bloom_inference/bloom_inference -p")
+    # run_command_on_tpu("mkdir bloom_inference -p")
+    
+    for i in glob.glob("*.py"):
+        conn.put(i, "bloom_inference/")
 
-    # conn.run("mkdir bloom-inference -p")
-    run_command_on_tpu("mkdir bloom-inference -p")
+    for i in glob.glob("bloom_inference/*.py"):
+        conn.put(i, "bloom_inference/bloom_inference/")
 
-    # for i in glob.glob("inference/*.py"):
-    #     conn.put(i, "bloom-inference/")
+    # copy_files_on_tpu("bloom_inference/*.py", "bloom_inference/")
 
-    copy_files_on_tpu("inference/*.py", "bloom-inference/")
+    # conn.run('sudo pip install -e bloom_inference/', hide=True)
+    # conn.run('python3 setup.py install --user', hide=True)
 
-    # conn.sudo('python3 setup.py install', hide=True)
-
-    # conn.put("scripts/init_ray_v2.sh", "/tmp/ray-tpu.sh")
-    # conn.sudo('chmod +x /tmp/ray-tpu.sh', hide=True)
-    # conn.sudo('/tmp/ray-tpu.sh', hide=True)
-    copy_files_on_tpu("scripts/ray_tpu.sh", "/tmp/ray-tpu.sh")
-    run_command_on_tpu("sudo chmod +x /tmp/ray-tpu.sh")
-    run_command_on_tpu("sudo /tmp/ray-tpu.sh")
+    conn.put("scripts/ray_tpu.sh", "/tmp/ray-tpu.sh")
+    conn.sudo('chmod +x /tmp/ray-tpu.sh', hide=True)
     try:
-        # conn.run('ray stop -f', hide=True)
-        run_command_on_tpu("ray stop -f")
+        conn.run('ray stop -f', hide=True)
+        # run_command_on_tpu("ray stop -f")
     except:
         pass
-
+    
     time.sleep(1)
-
-    # conn.run(f"TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=***REMOVED***32 * 1024**3***REMOVED*** ray start --address=***REMOVED***address***REMOVED*** --resources='" + '***REMOVED***"tpu": 1***REMOVED***\' --include-dashboard False', hide=True)
-    run_command_on_tpu(f"TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=***REMOVED***32 * 1024**3***REMOVED*** ray start --address=***REMOVED***address***REMOVED*** --resources='" + '***REMOVED***"tpu": 1***REMOVED***\' --include-dashboard False')
+    
+    out = conn.run(f'bash /tmp/ray-tpu.sh ***REMOVED***address***REMOVED***', hide=True)
+    print(out)
+    # copy_files_on_tpu("scripts/ray_tpu.sh", "/tmp/ray-tpu.sh")
+    # run_command_on_tpu("sudo chmod +x /tmp/ray-tpu.sh")
+    # run_command_on_tpu(f"sudo /tmp/ray-tpu.sh ***REMOVED***address***REMOVED***")
