@@ -1,15 +1,16 @@
 import functools
-from  multiprocessing import pool
+from multiprocessing import pool
 
 import ray
-from ray_tpu import create_tpu, wait_til, get_connection, start_ray
+from ray_tpu import get_connection, start_ray
 
 from bloom_inference.tpu_manager import TPUManager 
 
 cores_per_replica = 8
 tpu_size = 32
 
-tpu_name = "suraj-tpu-v3-32"
+#tpu_name = "suraaj-tpu-v3-32"
+tpu_name = "patrick-tpu-v3-32"
 region = "europe-west4-a"
 
 conns = get_connection(tpu_name, region)

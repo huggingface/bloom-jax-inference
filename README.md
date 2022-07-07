@@ -18,7 +18,12 @@ If the above does not work, run the following and then repeat:
    
 ```
 sudo apt-get update
-sudo apt-get install python3-virtualenv
+sudo apt-get install python3-venv
+```
+
+Activate Python env:
+```
+source /path/to/venv/bin/activate
 ```
 
 Check Python version is 3.8.10:
