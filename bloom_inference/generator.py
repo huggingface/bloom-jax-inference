@@ -66,7 +66,7 @@ class Generator:
 
     def load_model_and_params(self):
         # TODO loading params should be done in a thread
-        flax_ckpt = "bigscience/bloom-350m"
+        flax_ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
         tok_ckpt = "bigscience/bloom-350m"
 
         model, self.params = FlaxBloomForCausalLM.from_pretrained(
