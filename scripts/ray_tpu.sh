@@ -5,7 +5,7 @@ set -e
 screen -d -m python -c "import time; time.sleep(999999999)"
 
 # check if venv exists
-if [ -d ~/venv]
+if [ -f ~/venv/bin/activate ];
 then
   echo "venv exists"
   # activate venv (if not done so already)
@@ -14,7 +14,7 @@ then
   pip install -e bloom_inference/
 else
   echo "creating venv"
-  # get Linux updates, 'yes' to all
+  # get application updates, 'yes' to all
   yes | sudo apt-get update
   yes | sudo apt-get install python3.8-venv
 
@@ -23,11 +23,12 @@ else
   # activate venv
   source ~/venv/bin/activate
 
-  # pip install packages (JAX, ray etc)
-  pip install requests
-  pip install "jax[tpu]>=0.2.18" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-  pip install git+https://github.com/younesbelkada/transformers@add_bloom_flax
-  pip install ray==1.13.0 fabric dataclasses optax flax tqdm func_timeout
+  # pip install standard packages
+  pip install ray==1.13.0 transformers fabric dataclasses tqdm func_timeout
+  # build T5X from source
+  git clone --branch=main https://github.com/google-research/t5x
+  cd t5x && python3 -m pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html && cd ..
+  # And finally, Flax BLOOM
   pip install -e bloom_inference/
 fi
 

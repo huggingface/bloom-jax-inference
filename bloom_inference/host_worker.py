@@ -1,5 +1,3 @@
-# copied from https://github.com/kingoflolz/mesh-trzansformer-jax
-
 import ray
 import time
 from queue import Queue
@@ -7,26 +5,26 @@ from queue import Queue
 
 @ray.remote(resources=***REMOVED***"tpu": 1***REMOVED***)
 class TPUHostWorker(object):
-    def __init__(self, mesh_shape):
-        self.mesh_shape = mesh_shape
+    def __init__(self, num_mp_partitions):
+        # TODO: add other generation hp's as attributes
+        self.num_mp_partitions = num_mp_partitions
 
         self.input_q = Queue(maxsize=1)
         self.output_q = Queue(maxsize=1)
 
     def run(self):
-        print(f"jax runtime initialization starting")
+        # we import packages here to import JAX and Generator only on the Host worker and not the CPU manager
         import jax
-        
         from bloom_inference.generator import Generator, head_print
 
+        print(f"jax runtime initialization starting")
         start = time.time()
-        jax.devices()
         head_print(f"jax devices: ***REMOVED***jax.device_count()***REMOVED***")
         head_print(f"jax runtime initialized in ***REMOVED***time.time() - start:.06***REMOVED***s")
-        
-        # load model and params here
+
+        # load model and params
         head_print("Loading model")
-        generator = Generator(self.mesh_shape)
+        generator = Generator(self.num_mp_partitions)
         generator.load_model_and_params()
         head_print("Loading complete")
 

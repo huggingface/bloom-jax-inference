@@ -5,9 +5,10 @@ import numpy as np
 class TPUManager:
     # @func_set_timeout(1200)
     def __init__(self,
-                 mesh_shape,
+                 num_mp_partitions,
                  node_count):
-        assert ray.is_initialized()  # needs a valid ray cluster to start
+        # needs a valid ray cluster to start
+        assert ray.is_initialized(), "ray not initialised"
 
         from bloom_inference.host_worker import TPUHostWorker
 
@@ -17,7 +18,7 @@ class TPUManager:
         start = time.time()
 
         for i in range(node_count):
-            self.nodes.append(TPUHostWorker.options(max_concurrency=2).remote(mesh_shape))
+            self.nodes.append(TPUHostWorker.options(max_concurrency=2).remote(num_mp_partitions))
 
         for node in self.nodes:
             node.run.remote()
@@ -27,6 +28,7 @@ class TPUManager:
 
     # @func_set_timeout(600)
     def generate(self, context):
+        # TODO: split context (prompts) if len(context) != 4
         #context = np.array_split(context, len(self.nodes), axis=0)
         res = []
 
