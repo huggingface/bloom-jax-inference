@@ -28,6 +28,8 @@ else
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
   cd t5x && python3 -m pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html && cd ..
+  pip uninstall jax
+  pip install "jax[tpu]>=0.2.16" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
   # And finally, Flax BLOOM
   pip install -e bloom_inference/
 fi
