@@ -2,23 +2,18 @@ import numpy as np
 
 import jax
 import jax.numpy as jnp
-from flax.core.frozen_dict import freeze, unfreeze
+from flax.core.frozen_dict import freeze
 from jax.experimental import PartitionSpec as P
-from jax.experimental import maps
-from jax.experimental.pjit import pjit
-from flax.traverse_util import flatten_dict, unflatten_dict
-
-from t5x import partitioning
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 
 from bloom_inference import FlaxBloomForCausalLM, BloomConfig
 from transformers import AutoTokenizer
 
-ckpt = "bigscience/bloom-6b3"
+ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
 
 config = BloomConfig(n_layer=1)
-model, params = FlaxBloomForCausalLM.from_pretrained(ckpt, _do_init=False, dtype=jnp.bfloat16)
+model, params = FlaxBloomForCausalLM.from_pretrained(ckpt, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
 
 
