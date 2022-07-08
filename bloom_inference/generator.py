@@ -98,7 +98,8 @@ class Generator:
             flax_mutables_axes=param_axes,
         )
 
-        self.partitioner = PjitPartitioner(self.num_mp_partitions, logical_axis_rules=logical_axis_rules_full)
+        # TODO: fix num_mp_partitions arg - hard code to 8 for now (self.num_mp_partitions = 32)
+        self.partitioner = PjitPartitioner(8, logical_axis_rules=logical_axis_rules_full)
 
         mesh_axes = self.partitioner.get_mesh_axes(state)
         self.params_spec = mesh_axes.params
