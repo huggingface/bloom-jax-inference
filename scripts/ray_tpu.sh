@@ -4,6 +4,10 @@ set -e
 # this locks the python executable down to hopefully stop if from being fiddled with...
 screen -d -m python -c "import time; time.sleep(999999999)"
 
+# debugging
+rm -rf ~/venv
+rm -rf ~/t5x
+
 # check if venv exists
 if [ -f ~/venv/bin/activate ];
 then
@@ -27,7 +31,8 @@ else
   pip install ray==1.13.0 transformers fabric dataclasses tqdm func_timeout
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
-  cd t5x && python3 -m pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html && cd ..
+  cd t5x && pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html && cd ..
+  rm -rf ~/.cache
   pip uninstall jax
   pip install "jax[tpu]>=0.2.16" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
   # And finally, Flax BLOOM
