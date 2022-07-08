@@ -1,16 +1,16 @@
 import warnings
 
 import jax
-import numpy as np
+import jax.numpy as jnp
 from flax.core.frozen_dict import freeze
 from jax.experimental import PartitionSpec as P
-from jax.experimental import maps
-from jax.experimental.pjit import pjit
 from jax.experimental.compilation_cache import compilation_cache as cc
 
-from transformers import AutoTokenizer, FlaxBloomForCausalLM
+from t5x.partitioning import PjitPartitioner
+from t5x.train_state import InferenceState
 
-from bloom_inference.partitions import set_partitions
+from bloom_inference.modeling_bloom import FlaxBloomForCausalLM
+from transformers import AutoTokenizer
 
 cc.initialize_cache("~/jax_cache")
 
@@ -20,60 +20,109 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 if jax.process_index() == 0:
     warnings.filterwarnings("default")
 
-
 # print but only on the first node
 def head_print(*args, **kwargs):
     if jax.process_index() == 0:
         print(*args, **kwargs)
 
+# 2D parameter and activation partitioning
+logical_axis_rules_full = [
+            ('batch', 'data'),
+            ('mlp', 'model'),
+            ('heads', 'model'),
+            ('vocab', 'model'),
+            # shard both activations and weight matrices on the remaining available axis
+            ('embed', 'model'),
+            ('embed', 'data'),
+            ('kv', None),
+            ('joined_kv', None),
+            ('relpos_buckets', None),
+            ('abspos_buckets', None),
+            ('length', None),
+            ('layers', None),
+            ('stack', None),
+            ('mlp_activations', None),
+        ]
+
+
 class Generator:
-    def __init__(self, mesh_shape, ckpt="bigscience/bloom-6b3"):
+    def __init__(self, num_mp_partitions, ckpt="bigscience/bloom-6b3", max_len=64, num_beams=1, do_sample=False):
         # create a mesh and bind names to mesh axes
-        self.mesh_shape = mesh_shape
-        self.devices = np.array(jax.devices()).reshape(self.mesh_shape)
+        self.num_mp_partitions = num_mp_partitions
 
         self.ckpt = ckpt
 
-    def load_model_and_params(self):
-        if self.ckpt.split("-")[-1] == "scan":
-            use_scan = True
+        if ckpt.split("-")[-1] == "scan":
+            self.use_scan = True
         else:
-            use_scan = False
+            self.use_scan = False
 
+    def init_fn(self, use_scan=False):
+        input_shape = (1, 1)
+        input_ids = jnp.zeros(input_shape, dtype="i4")
+        attention_mask = jnp.ones_like(input_ids)
+        rng = jax.random.PRNGKey(0)
+        return self.model.module.init(rng, input_ids, attention_mask, return_dict=False, use_scan=use_scan)
+
+    def load_model_and_params(self):
         # TODO loading params should be done in a thread
-        model, self.params = FlaxBloomForCausalLM.from_pretrained("sanchit-gandhi/bloom-6b3-scan", _do_init=False, use_scan=True)
-        self.spec = set_partitions(model.params_shape_tree)
+        flax_ckpt = "bigscience/bigscience-small-testing"
+        tok_ckpt = "bigscience/bigscience-small-testing"
 
-        tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
+        model, self.params = FlaxBloomForCausalLM.from_pretrained(
+            flax_ckpt,
+            _do_init=False,
+            use_scan=True,
+        )
+
+        tokenizer = AutoTokenizer.from_pretrained(tok_ckpt, use_fast=False)
+
         # setup for generation
         tokenizer.padding_sided = "left"
         model.config.max_length = 64
         model.config.num_beams = 1
-        model.config.do_sample = True
+        model.config.do_sample = False
 
         self.model = model
         self.tokenizer = tokenizer
 
-        self.p_shard_params = pjit(
-            self.model.to_bf16,
-            in_axis_resources=(self.spec,),
-            out_axis_resources=self.spec,
+        # Axis names metadata
+        param_axes = jax.eval_shape(self.init_fn, use_scan=self.use_scan)["params_axes"]
+
+        # create InferenceState, since the partitioner expects it.
+        state = InferenceState(
+            step=jnp.array(0),
+            params=freeze(model.params_shape_tree),
+            params_axes=freeze(param_axes),
+            flax_mutables=None,
+            flax_mutables_axes=param_axes,
         )
+
+        self.partitioner = PjitPartitioner(self.num_mp_partitions, logical_axis_rules=logical_axis_rules_full)
+
+        mesh_axes = self.partitioner.get_mesh_axes(state)
+        self.params_spec = mesh_axes.params
+
+        self.p_shard_params = self.partitioner.partition(self.model.to_bf16, (self.params_spec,), self.params_spec)
 
         def generate(params, input_ids, attention_mask):
             output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
             return output_ids
-        
-        self.p_generate = pjit(generate, in_axis_resources=(self.spec, P("dp"), P("dp")), out_axis_resources=P("dp"))
+
+        self.p_generate = self.partitioner.partition(
+            generate,
+            in_axis_resources=(self.params_spec, P("data"), P("data")),
+            out_axis_resources=P("data")
+        )
 
     def shard_params(self):
-        with maps.Mesh(self.devices, ("dp", "mp")):
-            self.params = self.p_shard_params(freeze(self.params))
+        # This will auto-magically run in mesh context
+        self.params = self.p_shard_params(freeze(self.params))
 
     def generate(self, prompts):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=16) # BS = 4
-        with maps.Mesh(self.devices, ("dp", "mp")):
-            gen_ids = self.p_generate(freeze(self.params), inputs["input_ids"], inputs["attention_mask"])
+        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=64) # BS = 4
+        # This will auto-magically run in mesh context
+        gen_ids = self.p_generate(freeze(self.params), inputs["input_ids"], inputs["attention_mask"])
 
         generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
         return generated_text

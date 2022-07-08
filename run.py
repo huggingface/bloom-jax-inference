@@ -3,12 +3,11 @@ import time
 from multiprocessing import pool
 
 import ray
-from ray_tpu import get_connection, start_ray, stop_ray
+from ray_tpu import get_connection, start_ray
 
 from bloom_inference.tpu_manager import TPUManager 
 
-cores_per_replica = 8
-tpu_size = 32
+num_mp_partitions = 8
 
 #tpu_name = "suraj-tpu-v3-32"
 tpu_name = "patrick-tpu-v3-32"
@@ -25,7 +24,7 @@ with pool.ThreadPool(processes=len(conns)) as p:
     p.map(functools.partial(start_ray, address=address), conns)
 
 # initialise TPU manager
-t = TPUManager((tpu_size // cores_per_replica, cores_per_replica), len(conns))
+t = TPUManager(num_mp_partitions, len(conns))
 
 # benchmark compile step
 start = time.time()
@@ -37,9 +36,5 @@ start = time.time()
 print(t.generate(4*['Recipe for coconut pasta:']))
 print(f"Generations completed in {time.time() - start:.06}s")
 
-# shutdown TPU hosts
-with pool.ThreadPool(processes=len(conns)) as p:
-    p.map(stop_ray, conns)
-
-# shutdown CPU host
+# shutdown ray rpc
 ray.shutdown()

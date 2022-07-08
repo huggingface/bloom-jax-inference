@@ -516,18 +516,19 @@ class FlaxBloomBlockCollection(nn.Module):
             # assert not output_attentions, "cannot use `scan` with `output_attentions` set to `True`"
             # assert not output_hidden_states, "cannot use `scan` with `output_hidden_states` set to `True`"
             hidden_states = (hidden_states,)
+            layer_number = jnp.arange(self.config.num_hidden_layers)
 
             hidden_states, _ = scan_with_axes(
                 FlaxBloomBlock,
                 variable_axes={"params": 0, "cache": 0},
                 split_rngs={"params": True, "dropout": True},
-                in_axes=(nn.broadcast, nn.broadcast, 0),
+                in_axes=(nn.broadcast, nn.broadcast, 0, nn.broadcast, nn.broadcast),
                 length=self.config.num_hidden_layers,
             )(self.config, dtype=self.dtype, use_scan=True, name="FlaxBloomBlockLayers")(
                 hidden_states,
                 alibi,
                 attention_mask,  # kwargs not supported by scan
-                jnp.arange(self.config.num_hidden_layers),
+                layer_number,
                 deterministic,
                 init_cache,
             )
