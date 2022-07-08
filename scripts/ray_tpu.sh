@@ -5,8 +5,9 @@ set -e
 screen -d -m python -c "import time; time.sleep(999999999)"
 
 # debugging
-rm -rf ~/venv
-rm -rf ~/t5x
+#rm -rf ~/venv
+#rm -rf ~/t5x
+#rm -rf ~/.cache/pip
 
 # check if venv exists
 if [ -f ~/venv/bin/activate ];
@@ -31,9 +32,12 @@ else
   pip install ray==1.13.0 transformers fabric dataclasses tqdm func_timeout
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
-  cd t5x && pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html && cd ..
-  rm -rf ~/.cache
-  pip uninstall jax
+  cd t5x
+  python3 -m pip install -e '.[tpu]' -f \https://storage.googleapis.com/jax-releases/libtpu_releases.html
+  cd ..
+  rm -rf ~/.cache/pip
+  yes | pip uninstall jax
+  # force JAX to TPU version
   pip install "jax[tpu]>=0.2.16" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
   # And finally, Flax BLOOM
   pip install -e bloom_inference/

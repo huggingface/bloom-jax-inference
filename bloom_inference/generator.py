@@ -57,17 +57,17 @@ class Generator:
         else:
             self.use_scan = False
 
-    def init_fn(self, use_scan=False):
+    def init_fn(self):
         input_shape = (1, 1)
         input_ids = jnp.zeros(input_shape, dtype="i4")
         attention_mask = jnp.ones_like(input_ids)
         rng = jax.random.PRNGKey(0)
-        return self.model.module.init(rng, input_ids, attention_mask, return_dict=False, use_scan=use_scan)
+        return self.model.module.init(rng, input_ids, attention_mask, return_dict=False)
 
     def load_model_and_params(self):
         # TODO loading params should be done in a thread
-        flax_ckpt = "bigscience/bigscience-small-testing"
-        tok_ckpt = "bigscience/bigscience-small-testing"
+        flax_ckpt = "bigscience/bloom-350m"
+        tok_ckpt = "bigscience/bloom-350m"
 
         model, self.params = FlaxBloomForCausalLM.from_pretrained(
             flax_ckpt,
@@ -87,7 +87,7 @@ class Generator:
         self.tokenizer = tokenizer
 
         # Axis names metadata
-        param_axes = jax.eval_shape(self.init_fn, use_scan=self.use_scan)["params_axes"]
+        param_axes = jax.eval_shape(self.init_fn)["params_axes"]
 
         # create InferenceState, since the partitioner expects it.
         state = InferenceState(
