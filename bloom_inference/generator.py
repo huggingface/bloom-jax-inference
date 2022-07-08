@@ -35,8 +35,13 @@ class Generator:
         self.ckpt = ckpt
 
     def load_model_and_params(self):
+        if self.ckpt.split("-")[-1] == "scan":
+            use_scan = True
+        else:
+            use_scan = False
+
         # TODO loading params should be done in a thread
-        model, self.params = FlaxBloomForCausalLM.from_pretrained(self.ckpt, _do_init=False, use_scan=False)
+        model, self.params = FlaxBloomForCausalLM.from_pretrained("sanchit-gandhi/bloom-6b3-scan", _do_init=False, use_scan=True)
         self.spec = set_partitions(model.params_shape_tree)
 
         tokenizer = AutoTokenizer.from_pretrained(self.ckpt)

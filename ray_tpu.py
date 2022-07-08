@@ -71,3 +71,9 @@ def start_ray(conn, address):
     out = conn.run(f'bash /tmp/ray-tpu.sh {address}', hide=True)
     # display result
     print(out)
+
+
+def stop_ray(conn):
+    out = conn.run("ray stop -f", hide=True)
+    # display result
+    print(out)
