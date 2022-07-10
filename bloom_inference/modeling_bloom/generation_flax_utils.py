@@ -34,7 +34,7 @@ from .generation_flax_logits_process import (
     FlaxTopKLogitsWarper,
     FlaxTopPLogitsWarper,
 )
-from transformes.utils import ModelOutput, logging
+from transformers.utils import ModelOutput, logging
 
 
 logger = logging.get_logger(__name__)
