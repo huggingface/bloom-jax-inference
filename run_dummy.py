@@ -23,7 +23,7 @@ Ids [[ 3  3  3  3  3  3  3  3  3  3  3  3  3  3  3 22 22 22 22 22]
  [ 3  3  3  3  3  3  3  3  3 11 30 31 56 11 27 52 52 52 52 52]]
 """
 print("EXPECTED ids:", expected_ids)
-gen_ids = model.generate(**inputs, trace=False).sequences
+gen_ids = model.generate(**inputs).sequences
 print("Ids", gen_ids)
 expected_str = "generated text ['33333', '(;<U(8QQQQQ'"
 print(40 * "-")

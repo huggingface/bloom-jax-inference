@@ -220,7 +220,6 @@ class FlaxBloomAttention(nn.Module):
                 value = cached_value.value + one_token_value * one_hot_indices
                 print(one_hot_indices.shape)
 
-            import ipdb; ipdb.set_trace()
             print(one_token_key.shape)
 
             cached_key.value = key
