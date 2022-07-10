@@ -21,6 +21,7 @@
 # TODO: check that code is jit-able
 
 import math
+from functools import partial
 from typing import Optional, Tuple
 
 import flax.linen as nn
@@ -43,7 +44,6 @@ from .layers import with_sharding_constraint
 
 
 logger = logging.get_logger(__name__)
-
 
 
 def build_alibi_tensor_flax(attention_mask, n_head, dtype):
@@ -99,20 +99,34 @@ class FlaxBloomAttention(nn.Module):
                 f"`num_heads`: {self.num_heads})."
             )
 
-        self.query_key_value = layers.DenseGeneral(
-            axis=-1,
-            features=(self.num_heads, self.head_dim * 3),
-            kernel_axes=('embed', 'heads', 'kv'),
+        # TODO(PVP) - delete following 7 / uncomment rest
+        dense = partial(
+            nn.Dense,
             dtype=self.dtype,
+            kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
         )
-        self.dense = layers.DenseGeneral(
-            features=self.hidden_size,
-            axis=(-2, -1),
+        self.query_key_value = dense(self.hidden_size * 3)
+        self.dense = dense(self.hidden_size)
+#        self.query_key_value = layers.DenseGeneral(
+#            axis=-1,
+#            features=(self.num_heads, self.head_dim * 3),
+#            kernel_axes=('embed', 'heads', 'kv'),
+#            dtype=self.dtype,
+#        )
+#        self.dense = layers.DenseGeneral(
+#            features=self.hidden_size,
+#            axis=(-2, -1),
             # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
-            kernel_axes=('heads', 'kv', 'embed'),
-            dtype=self.dtype,
-        )
+#            kernel_axes=('heads', 'kv', 'embed'),
+#            dtype=self.dtype,
+#        )
         self.resid_dropout = nn.Dropout(rate=self.config.hidden_dropout)
+
+    def _split_heads(self, hidden_states):
+        return hidden_states.reshape(hidden_states.shape[:-1] + (self.num_heads, 3 * self.head_dim))
+
+    def _merge_heads(self, hidden_states):
+        return hidden_states.reshape(hidden_states.shape[:2] + (self.hidden_size,))
 
     @nn.compact
     # Copied from transformers.models.gptj.modeling_flax_gptj.FlaxGPTJAttention._concatenate_to_cache
@@ -146,7 +160,7 @@ class FlaxBloomAttention(nn.Module):
             )
             attention_mask = combine_masks(pad_mask, attention_mask)
         return key, value, attention_mask
-    
+
     def __call__(
         self,
         hidden_states,
@@ -156,17 +170,22 @@ class FlaxBloomAttention(nn.Module):
         init_cache: bool = False,
         output_attentions: bool = False,
         layer_number: int = None,
-    ):  
+    ):
 
         batch_size, seq_length = hidden_states.shape[:2]
 
         # proj q, k, v
         fused_qkv = self.query_key_value(hidden_states)
+
+        # TODO(PVP) delete following line
+        fused_qkv = self._split_heads(fused_qkv)
+
         query, key, value = jnp.split(fused_qkv, 3, axis=-1)
-        
-        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
-        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
-        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
+
+        # TODO(PVP) - uncomment other three
+#        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
+#        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
+#        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
 
         causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
 
@@ -225,6 +244,9 @@ class FlaxBloomAttention(nn.Module):
         )
 
         attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value)
+        # TODO(PVP) delete following line
+        attn_output = self._merge_heads(attn_output)
+
         attn_output = self.dense(attn_output)
 
         outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
@@ -319,7 +341,7 @@ class FlaxBloomBlock(nn.Module):
         hidden_states = with_sharding_constraint(hidden_states, ('batch', 'length', 'embed'))
         layernorm_output = self.input_layernorm(hidden_states)
         layernorm_output = with_sharding_constraint(layernorm_output, ('batch', 'length', 'embed'))
-        
+
         # layer norm before saving residual if config calls for it
         if self.apply_residual_connection_post_layernorm:
             residual = layernorm_output
