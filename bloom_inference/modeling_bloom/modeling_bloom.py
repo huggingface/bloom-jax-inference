@@ -34,10 +34,10 @@ from flax.traverse_util import flatten_dict, unflatten_dict
 from jax import lax
 
 from transformers.modeling_flax_outputs import FlaxCausalLMOutput, FlaxBaseModelOutputWithPast
-from transformers.modeling_flax_utils import FlaxPreTrainedModel
 from transformers.utils import logging
 
 from .configuration_bloom import BloomConfig
+from . import FlaxPreTrainedModel
 from . import layers
 from .layers import with_sharding_constraint
 
