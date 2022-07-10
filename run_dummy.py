@@ -4,17 +4,17 @@ from bloom_inference import FlaxBloomForCausalLM, BloomConfig
 from transformers import AutoTokenizer
 
 vocab_size = 64
+max_length = 15
 config = BloomConfig(n_layer=2, vocab_size=vocab_size, hidden_size=32, n_head=2, pad_token_id=0)
 
 #model = FlaxBloomForCausalLM(config)
-model = FlaxBloomForCausalLM.from_pretrained("bloom-jax-dummy", local_files_only=True)
+model = FlaxBloomForCausalLM.from_pretrained("bloom-jax-dummy", local_files_only=True, max_length=32)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False, local_files_only=True)
 
 prompts = ["Hello", "hello there this is a longer sentence"]
 
 tokenizer.padding_side = "left"
-inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=10)
-
+inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=8)
 inputs["input_ids"] = inputs["input_ids"] % vocab_size
 
 print(40 * "-")
