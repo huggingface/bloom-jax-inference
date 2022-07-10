@@ -37,7 +37,7 @@ from transformers.modeling_flax_outputs import FlaxCausalLMOutput, FlaxBaseModel
 from transformers.utils import logging
 
 from .configuration_bloom import BloomConfig
-from . import FlaxPreTrainedModel
+from .modeling_flax_utils import FlaxPreTrainedModel
 from . import layers
 from .layers import with_sharding_constraint
 
