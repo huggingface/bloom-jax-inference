@@ -21,6 +21,7 @@
 # TODO: check that code is jit-able
 
 import math
+from functools import partial
 from typing import Optional, Tuple
 
 import flax.linen as nn
@@ -43,7 +44,6 @@ from .layers import with_sharding_constraint
 
 
 logger = logging.get_logger(__name__)
-
 
 
 def build_alibi_tensor_flax(attention_mask, n_head, dtype):
@@ -99,6 +99,14 @@ class FlaxBloomAttention(nn.Module):
                 f"`num_heads`: {self.num_heads})."
             )
 
+        # TODO(PVP) - delete following 7 / uncomment rest
+        # dense = partial(
+        #     nn.Dense,
+        #     dtype=self.dtype,
+        #     kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+        # )
+        # self.query_key_value = dense(self.hidden_size * 3)
+        # self.dense = dense(self.hidden_size)
         self.query_key_value = layers.DenseGeneral(
             axis=-1,
             features=(self.num_heads, self.head_dim * 3),
@@ -108,45 +116,83 @@ class FlaxBloomAttention(nn.Module):
         self.dense = layers.DenseGeneral(
             features=self.hidden_size,
             axis=(-2, -1),
-            # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+           # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
             kernel_axes=('heads', 'kv', 'embed'),
             dtype=self.dtype,
         )
         self.resid_dropout = nn.Dropout(rate=self.config.hidden_dropout)
 
+    def _split_heads(self, hidden_states):
+        return hidden_states.reshape(hidden_states.shape[:-1] + (self.num_heads, 3 * self.head_dim))
+
+    def _merge_heads(self, hidden_states):
+        return hidden_states.reshape(hidden_states.shape[:2] + (self.hidden_size,))
+
     @nn.compact
-    # Copied from transformers.models.gptj.modeling_flax_gptj.FlaxGPTJAttention._concatenate_to_cache
     def _concatenate_to_cache(self, key, value, query, attention_mask):
-        """
-        This function takes projected key, value states from a single input token and concatenates the states to cached
-        states from previous steps. This function is slighly adapted from the official Flax repository:
-        https://github.com/google/flax/blob/491ce18759622506588784b4fca0e4bf05f8c8cd/flax/linen/attention.py#L252
-        """
-        # detect if we're initializing by absence of existing cache data.
-        is_initialized = self.has_variable("cache", "cached_key")
-        cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
-        cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
-        cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
+        # The following code is largely copied from:
+        # https://github.com/google-research/t5x/blob/63d9addf628c6d8c547a407a32095fcb527bb20b/t5x/examples/scalable_t5/layers.py#L280-L284
+        is_initialized = self.has_variable('cache', 'cached_key')
+        # The key and value have dimension [batch_size, seq_length, num_heads, head_dim],
+        # but we cache them as [batch_size, num_heads, head_dim, seq_length] as a TPU
+        # fusion optimization. This also enables the "scatter via one-hot
+        # broadcast" trick, which means we do a one-hot broadcast instead of a
+        # scatter/gather operations, resulting in a 3-4x speedup in practice.
+        swap_dims = lambda x: x[:-3] + tuple(x[i] for i in [-2, -1, -3])  # noqa: E731
+
+        cached_key = self.variable('cache', 'cached_key', jnp.zeros, swap_dims(key.shape), key.dtype)
+        cached_value = self.variable('cache', 'cached_value', jnp.zeros, swap_dims(value.shape), value.dtype)
+        cache_index = self.variable('cache', 'cache_index', lambda: jnp.array(0, dtype=jnp.int32))
 
         if is_initialized:
-            *batch_dims, max_length, num_heads, depth_per_head = cached_key.value.shape
-            # update key, value caches with our new 1d spatial slices
+            batch_size, num_heads, head_dim, seq_length = (cached_key.value.shape)
+            # During fast autoregressive decoding, we feed one position at a time,
+            # and cache the keys and values step by step.
+            # Sanity shape check of cached key against input query.
+            num_updated_cache_vectors = query.shape[1]
+            expected_shape = (batch_size, 1, num_heads, head_dim)
+            if num_updated_cache_vectors == 1 and expected_shape != query.shape:
+                raise ValueError(f"Autoregressive cache shape error, expected query shape {expected_shape} instead got {query.shape}")
+
+            # Create a OHE of the current index. NOTE: the index is increased below.
             cur_index = cache_index.value
-            indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
-            key = lax.dynamic_update_slice(cached_key.value, key, indices)
-            value = lax.dynamic_update_slice(cached_value.value, value, indices)
+
+            # In order to update the key, value caches with the current key and
+            # value, we move the seq_length axis to the back, similar to what we did for
+            # the cached ones above.
+            # Note these are currently the key and value of a single position, since
+            # we feed one position at a time.
+            one_token_key = jnp.moveaxis(key, -3, -1)
+            one_token_value = jnp.moveaxis(value, -3, -1)
+
+            # Update key, value caches with our new 1d spatial slices.
+            # We implement an efficient scatter into the cache via one-hot
+            # broadcast and addition.
+            if num_updated_cache_vectors > 1:
+                indices = jnp.eye(num_updated_cache_vectors, seq_length)[None, None]
+                key = cached_key.value + jnp.matmul(one_token_key, indices)
+                value = cached_value.value + jnp.matmul(one_token_value, indices)
+            else:
+                one_hot_indices = jax.nn.one_hot(cur_index, seq_length, dtype=key.dtype)
+                key = cached_key.value + one_token_key * one_hot_indices
+                value = cached_value.value + one_token_value * one_hot_indices
+
             cached_key.value = key
             cached_value.value = value
-            num_updated_cache_vectors = query.shape[1]
             cache_index.value = cache_index.value + num_updated_cache_vectors
+
+            # Move the keys and values back to their original shapes.
+            key = jnp.moveaxis(key, -1, -3)
+            value = jnp.moveaxis(value, -1, -3)
+
             # causal mask for cached decoder self-attention: our single query position should only attend to those key positions that have already been generated and cached, not the remaining zero elements.
             pad_mask = jnp.broadcast_to(
-                jnp.arange(max_length) < cur_index + num_updated_cache_vectors,
-                tuple(batch_dims) + (1, num_updated_cache_vectors, max_length),
+                jnp.arange(seq_length) < cur_index + num_updated_cache_vectors,
+                (batch_size,) + (1, num_updated_cache_vectors, seq_length),
             )
             attention_mask = combine_masks(pad_mask, attention_mask)
         return key, value, attention_mask
-    
+
     def __call__(
         self,
         hidden_states,
@@ -156,14 +202,19 @@ class FlaxBloomAttention(nn.Module):
         init_cache: bool = False,
         output_attentions: bool = False,
         layer_number: int = None,
-    ):  
+    ):
 
         batch_size, seq_length = hidden_states.shape[:2]
 
         # proj q, k, v
         fused_qkv = self.query_key_value(hidden_states)
+
+        # TODO(PVP) delete following line
+        # fused_qkv = self._split_heads(fused_qkv)
+
         query, key, value = jnp.split(fused_qkv, 3, axis=-1)
-        
+
+        # TODO(PVP) - uncomment other three
         query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
         key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
         value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
@@ -177,7 +228,9 @@ class FlaxBloomAttention(nn.Module):
 
         # fast decoding for generate requires special attention_mask
         if self.has_variable("cache", "cached_key"):
-            max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
+            # sequence_length of cached_key is last dim
+            # TODO(PVP) - uncomment other three
+            max_decoder_length = self.variables["cache"]["cached_key"].shape[-1]
             causal_attention_mask = jax.lax.dynamic_slice(
                 causal_attention_mask,
                 (0, 0, causal_attention_mask_shift, 0),
@@ -189,6 +242,7 @@ class FlaxBloomAttention(nn.Module):
             causal_attention_mask, (batch_size,) + causal_attention_mask.shape[1:]
         )
         attention_mask = jnp.broadcast_to(jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape)
+
         attention_mask = combine_masks(attention_mask, causal_attention_mask)
 
         dropout_rng = None
@@ -225,6 +279,9 @@ class FlaxBloomAttention(nn.Module):
         )
 
         attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value)
+        # TODO(PVP) delete following line
+        # attn_output = self._merge_heads(attn_output)
+
         attn_output = self.dense(attn_output)
 
         outputs = (attn_output, attn_weights) if output_attentions else (attn_output,)
@@ -319,7 +376,7 @@ class FlaxBloomBlock(nn.Module):
         hidden_states = with_sharding_constraint(hidden_states, ('batch', 'length', 'embed'))
         layernorm_output = self.input_layernorm(hidden_states)
         layernorm_output = with_sharding_constraint(layernorm_output, ('batch', 'length', 'embed'))
-        
+
         # layer norm before saving residual if config calls for it
         if self.apply_residual_connection_post_layernorm:
             residual = layernorm_output
