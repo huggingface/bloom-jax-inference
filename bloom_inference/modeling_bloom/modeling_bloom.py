@@ -128,47 +128,37 @@ class FlaxBloomAttention(nn.Module):
     def _merge_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.hidden_size,))
 
-#    @nn.compact
-    # Copied from transformers.models.gptj.modeling_flax_gptj.FlaxGPTJAttention._concatenate_to_cache
-#    def _concatenate_to_cache(self, key, value, query, attention_mask):
-#        """
-#        This function takes projected key, value states from a single input token and concatenates the states to cached
-#        states from previous steps. This function is slighly adapted from the official Flax repository:
-#        https://github.com/google/flax/blob/491ce18759622506588784b4fca0e4bf05f8c8cd/flax/linen/attention.py#L252
-#        """
-#        swap_dims = lambda x: x[:-3] + tuple(x[i] for i in [-2, -1, -3])  # noqa: E731
-#
+    # @nn.compact
+    def _concatenate_to_cache_2(self, key, value, query, attention_mask):
+        """
+        This function takes projected key, value states from a single input token and concatenates the states to cached
+        states from previous steps. This function is slighly adapted from the official Flax repository:
+        https://github.com/google/flax/blob/491ce18759622506588784b4fca0e4bf05f8c8cd/flax/linen/attention.py#L252
+        """
         # detect if we're initializing by absence of existing cache data.
-#        is_initialized = self.has_variable("cache", "cached_key")
-#        cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
-#        cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
-#        cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
-#
-#        swap_dims = lambda x: x[:-3] + tuple(x[i] for i in [-2, -1, -3])
-#          cached_key = self.variable('cache', 'cached_key', jnp.zeros,
-#                                     swap_dims(key.shape), key.dtype)
-#          cached_value = self.variable('cache', 'cached_value', jnp.zeros,
-#                                       swap_dims(value.shape), value.dtype)
-#
-#        if is_initialized:
-#            *batch_dims, max_length, num_heads, depth_per_head = cached_key.value.shape
+        is_initialized = self.has_variable("cache", "cached_key")
+        cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
+        cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
+        cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
+
+        if is_initialized:
+            *batch_dims, max_length, num_heads, depth_per_head = cached_key.value.shape
             # update key, value caches with our new 1d spatial slices
-#            cur_index = cache_index.value
-#            indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
-#            key = lax.dynamic_update_slice(cached_key.value, key, indices)
-#            value = lax.dynamic_update_slice(cached_value.value, value, indices)
-#            cached_key.value = key
-#            cached_value.value = value
-#            num_updated_cache_vectors = query.shape[1]
-#            cache_index.value = cache_index.value + num_updated_cache_vectors
+            cur_index = cache_index.value
+            indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
+            key = lax.dynamic_update_slice(cached_key.value, key, indices)
+            value = lax.dynamic_update_slice(cached_value.value, value, indices)
+            cached_key.value = key
+            cached_value.value = value
+            num_updated_cache_vectors = query.shape[1]
+            cache_index.value = cache_index.value + num_updated_cache_vectors
             # causal mask for cached decoder self-attention: our single query position should only attend to those key positions that have already been generated and cached, not the remaining zero elements.
-#            pad_mask = jnp.broadcast_to(
-#                jnp.arange(max_length) < cur_index + num_updated_cache_vectors,
-#                tuple(batch_dims) + (1, num_updated_cache_vectors, max_length),
-#            )
-#            attention_mask = combine_masks(pad_mask, attention_mask)
-#        return key, value, attention_mask
-#
+            pad_mask = jnp.broadcast_to(
+                jnp.arange(max_length) < cur_index + num_updated_cache_vectors,
+                tuple(batch_dims) + (1, num_updated_cache_vectors, max_length),
+            )
+            attention_mask = combine_masks(pad_mask, attention_mask)
+        return key, value, attention_mask
 
     @nn.compact
     def _concatenate_to_cache(self, key, value, query, attention_mask):
@@ -218,9 +208,6 @@ class FlaxBloomAttention(nn.Module):
                 one_hot_indices = jax.nn.one_hot(cur_index, seq_length, dtype=key.dtype)
                 key = cached_key.value + one_token_key * one_hot_indices
                 value = cached_value.value + one_token_value * one_hot_indices
-                print(one_hot_indices.shape)
-
-            print(one_token_key.shape)
 
             cached_key.value = key
             cached_value.value = value
@@ -274,7 +261,9 @@ class FlaxBloomAttention(nn.Module):
         # fast decoding for generate requires special attention_mask
         if self.has_variable("cache", "cached_key"):
             # sequence_length of cached_key is last dim
+            # TODO(PVP) - uncomment other three
             max_decoder_length = self.variables["cache"]["cached_key"].shape[-1]
+            # max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
             causal_attention_mask = jax.lax.dynamic_slice(
                 causal_attention_mask,
                 (0, 0, causal_attention_mask_shift, 0),
@@ -298,6 +287,7 @@ class FlaxBloomAttention(nn.Module):
         # and cache the keys and values step by step.
         if self.has_variable("cache", "cached_key") or init_cache:
             key, value, attention_mask = self._concatenate_to_cache(key, value, query, attention_mask)
+            # key, value, attention_mask = self._concatenate_to_cache_2(key, value, query, attention_mask)
 
         # transform boolean mask into float mask
         mask_value = jnp.finfo(self.dtype).min
