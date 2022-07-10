@@ -7,8 +7,8 @@ vocab_size = 64
 max_length = 15
 config = BloomConfig(n_layer=2, vocab_size=vocab_size, hidden_size=32, n_head=2, pad_token_id=0)
 
-#model = FlaxBloomForCausalLM(config)
-model = FlaxBloomForCausalLM.from_pretrained("bloom-jax-dummy", local_files_only=True, max_length=32)
+model = FlaxBloomForCausalLM(config)
+#model = FlaxBloomForCausalLM.from_pretrained("bloom-jax-dummy", local_files_only=True, max_length=32)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False, local_files_only=True)
 
 prompts = ["Hello", "hello there this is a longer sentence"]
