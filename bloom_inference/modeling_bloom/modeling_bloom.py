@@ -100,26 +100,26 @@ class FlaxBloomAttention(nn.Module):
             )
 
         # TODO(PVP) - delete following 7 / uncomment rest
-        dense = partial(
-            nn.Dense,
+        # dense = partial(
+        #     nn.Dense,
+        #     dtype=self.dtype,
+        #     kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+        # )
+        # self.query_key_value = dense(self.hidden_size * 3)
+        # self.dense = dense(self.hidden_size)
+        self.query_key_value = layers.DenseGeneral(
+            axis=-1,
+            features=(self.num_heads, self.head_dim * 3),
+            kernel_axes=('embed', 'heads', 'kv'),
             dtype=self.dtype,
-            kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
         )
-        self.query_key_value = dense(self.hidden_size * 3)
-        self.dense = dense(self.hidden_size)
-#        self.query_key_value = layers.DenseGeneral(
-#            axis=-1,
-#            features=(self.num_heads, self.head_dim * 3),
-#            kernel_axes=('embed', 'heads', 'kv'),
-#            dtype=self.dtype,
-#        )
-#        self.dense = layers.DenseGeneral(
-#            features=self.hidden_size,
-#            axis=(-2, -1),
-            # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
-#            kernel_axes=('heads', 'kv', 'embed'),
-#            dtype=self.dtype,
-#        )
+        self.dense = layers.DenseGeneral(
+            features=self.hidden_size,
+            axis=(-2, -1),
+           # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+            kernel_axes=('heads', 'kv', 'embed'),
+            dtype=self.dtype,
+        )
         self.resid_dropout = nn.Dropout(rate=self.config.hidden_dropout)
 
     def _split_heads(self, hidden_states):
@@ -127,38 +127,6 @@ class FlaxBloomAttention(nn.Module):
 
     def _merge_heads(self, hidden_states):
         return hidden_states.reshape(hidden_states.shape[:2] + (self.hidden_size,))
-
-    # @nn.compact
-    def _concatenate_to_cache_2(self, key, value, query, attention_mask):
-        """
-        This function takes projected key, value states from a single input token and concatenates the states to cached
-        states from previous steps. This function is slighly adapted from the official Flax repository:
-        https://github.com/google/flax/blob/491ce18759622506588784b4fca0e4bf05f8c8cd/flax/linen/attention.py#L252
-        """
-        # detect if we're initializing by absence of existing cache data.
-        is_initialized = self.has_variable("cache", "cached_key")
-        cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
-        cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
-        cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
-
-        if is_initialized:
-            *batch_dims, max_length, num_heads, depth_per_head = cached_key.value.shape
-            # update key, value caches with our new 1d spatial slices
-            cur_index = cache_index.value
-            indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
-            key = lax.dynamic_update_slice(cached_key.value, key, indices)
-            value = lax.dynamic_update_slice(cached_value.value, value, indices)
-            cached_key.value = key
-            cached_value.value = value
-            num_updated_cache_vectors = query.shape[1]
-            cache_index.value = cache_index.value + num_updated_cache_vectors
-            # causal mask for cached decoder self-attention: our single query position should only attend to those key positions that have already been generated and cached, not the remaining zero elements.
-            pad_mask = jnp.broadcast_to(
-                jnp.arange(max_length) < cur_index + num_updated_cache_vectors,
-                tuple(batch_dims) + (1, num_updated_cache_vectors, max_length),
-            )
-            attention_mask = combine_masks(pad_mask, attention_mask)
-        return key, value, attention_mask
 
     @nn.compact
     def _concatenate_to_cache(self, key, value, query, attention_mask):
@@ -242,14 +210,14 @@ class FlaxBloomAttention(nn.Module):
         fused_qkv = self.query_key_value(hidden_states)
 
         # TODO(PVP) delete following line
-        fused_qkv = self._split_heads(fused_qkv)
+        # fused_qkv = self._split_heads(fused_qkv)
 
         query, key, value = jnp.split(fused_qkv, 3, axis=-1)
 
         # TODO(PVP) - uncomment other three
-#        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
-#        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
-#        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
+        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
+        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
+        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
 
         causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
 
@@ -263,7 +231,6 @@ class FlaxBloomAttention(nn.Module):
             # sequence_length of cached_key is last dim
             # TODO(PVP) - uncomment other three
             max_decoder_length = self.variables["cache"]["cached_key"].shape[-1]
-            # max_decoder_length = self.variables["cache"]["cached_key"].shape[1]
             causal_attention_mask = jax.lax.dynamic_slice(
                 causal_attention_mask,
                 (0, 0, causal_attention_mask_shift, 0),
@@ -287,7 +254,6 @@ class FlaxBloomAttention(nn.Module):
         # and cache the keys and values step by step.
         if self.has_variable("cache", "cached_key") or init_cache:
             key, value, attention_mask = self._concatenate_to_cache(key, value, query, attention_mask)
-            # key, value, attention_mask = self._concatenate_to_cache_2(key, value, query, attention_mask)
 
         # transform boolean mask into float mask
         mask_value = jnp.finfo(self.dtype).min
@@ -314,7 +280,7 @@ class FlaxBloomAttention(nn.Module):
 
         attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value)
         # TODO(PVP) delete following line
-        attn_output = self._merge_heads(attn_output)
+        # attn_output = self._merge_heads(attn_output)
 
         attn_output = self.dense(attn_output)
 
