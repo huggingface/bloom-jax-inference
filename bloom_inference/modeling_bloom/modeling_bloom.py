@@ -631,9 +631,10 @@ class FlaxBloomModule(nn.Module):
             self.config.vocab_size,
             self.embed_dim,
             embedding_init=self.embedding_init,
+            dtype=self.dtype,
         )
         # post-embedding layernorm
-        self.word_embeddings_layernorm = layers.LayerNorm(epsilon=self.config.layer_norm_epsilon)
+        self.word_embeddings_layernorm = layers.LayerNorm(epsilon=self.config.layer_norm_epsilon, dtype=self.dtype)
 
         # transformer layers
         self.h = FlaxBloomBlockCollection(self.config, dtype=self.dtype, use_scan=self.use_scan)
