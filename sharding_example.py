@@ -70,14 +70,23 @@ params_spec = mesh_axes.params
 # This will auto-magically run in mesh context
 # params = shard_params(freeze(params))
 
-init_params = partitioner.partition(init_fn, None, params_spec)
 
-# This will auto-magically run in mesh context
+def init_params():
+    input_shape = (1, 1)
+    input_ids = jnp.zeros(input_shape, dtype="i4")
+    attention_mask = jnp.ones_like(input_ids)
+    rng = jax.random.PRNGKey(0)
+    return model.module.init(rng, input_ids, attention_mask, return_dict=False)["params"]
+
+
+init_params = partitioner.partition(init_params, None, params_spec)
 params = init_params()
+
 
 def generate(params, input_ids, attention_mask):
     output_ids = model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
     return output_ids
+
 
 p_generate = partitioner.partition(
     generate,
