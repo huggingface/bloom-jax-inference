@@ -9,7 +9,8 @@ from jax.experimental.compilation_cache import compilation_cache as cc
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 
-from bloom_inference.modeling_bloom import FlaxBloomForCausalLM
+from bloom_inference.modeling_bloom.modeling_bloom import FlaxBloomForCausalLM
+from bloom_inference.modeling_bloom.configuration_bloom import BloomConfig
 from transformers import AutoTokenizer
 
 cc.initialize_cache("~/jax_cache")
@@ -64,16 +65,23 @@ class Generator:
         rng = jax.random.PRNGKey(0)
         return self.model.module.init(rng, input_ids, attention_mask, return_dict=False)
 
+    def init_params(self):
+        return self.init_fn()["params"]
+
     def load_model_and_params(self):
         # TODO loading params should be done in a thread
         flax_ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
         tok_ckpt = "bigscience/bloom-350m"
 
-        model, self.params = FlaxBloomForCausalLM.from_pretrained(
+        config = BloomConfig.from_pretrained(flax_ckpt)
+
+        model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+
+        """model, self.params = FlaxBloomForCausalLM.from_pretrained(
             flax_ckpt,
             _do_init=False,
             use_scan=True,
-        )
+        )"""
 
         tokenizer = AutoTokenizer.from_pretrained(tok_ckpt, use_fast=False)
 
@@ -104,6 +112,8 @@ class Generator:
         mesh_axes = self.partitioner.get_mesh_axes(state)
         self.params_spec = mesh_axes.params
 
+        self.init_params = self.partitioner.partition(self.init_params, None, self.params_spec)
+
         self.p_shard_params = self.partitioner.partition(self.model.to_bf16, (self.params_spec,), self.params_spec)
 
         def generate(params, input_ids, attention_mask):
@@ -118,7 +128,8 @@ class Generator:
 
     def shard_params(self):
         # This will auto-magically run in mesh context
-        self.params = self.p_shard_params(freeze(self.params))
+        # self.params = self.p_shard_params(freeze(self.params))
+        self.params = self.init_params()
 
     def generate(self, prompts):
         inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=64) # BS = 4
