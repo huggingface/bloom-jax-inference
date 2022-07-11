@@ -15,13 +15,15 @@ model = FlaxBloomForCausalLM.from_pretrained("sanchit-gandhi/bloom-760m-scan", u
 params = model.params
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m")
 
+# tokenizer.padding_side = "left"
+
 prompt = 4 * ["hello there this is a longer sentence", "hi"]
 
 rng = jax.random.PRNGKey(0)
 rngs = jax.random.split(rng, num_devices)
 
 def generate(params, inputs):
-    output_ids = model.generate(**inputs, params=params).sequences
+    output_ids = model.generate(inputs["input_ids"], params=params).sequences
     return output_ids
 
 p_generate = jax.pmap(generate, "batch")

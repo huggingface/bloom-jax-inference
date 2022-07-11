@@ -74,7 +74,7 @@ def build_alibi_tensor_flax(attention_mask, n_head, dtype):
     query_length = 1
 
     slopes = jnp.array(get_slopes(n_head))[None, :, None, None].astype(dtype)
-    arange_tensor = attention_mask.cumsum(-1, dtype=dtype)[:, None, None, :] - 1
+    arange_tensor = jnp.full_like(attention_mask, 1).cumsum(-1, dtype=dtype)[:, None, None, :] - 1
 
     slopes_broadcasted = jnp.broadcast_to(slopes, (batch_size, num_heads, query_length, key_length))
     arange_broadcasted = jnp.broadcast_to(arange_tensor, (batch_size, num_heads, query_length, key_length))
@@ -244,7 +244,8 @@ class FlaxBloomAttention(nn.Module):
         )
         attention_mask = jnp.broadcast_to(jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape)
 
-        attention_mask = combine_masks(attention_mask, causal_attention_mask)
+        attention_mask = causal_attention_mask
+        # attention_mask = combine_masks(attention_mask, causal_attention_mask)
 
         dropout_rng = None
         deterministic = True
