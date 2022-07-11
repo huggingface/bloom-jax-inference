@@ -100,26 +100,27 @@ class FlaxBloomAttention(nn.Module):
             )
 
         # TODO(PVP) - delete following 7 / uncomment rest
-        dense = partial(
-            nn.Dense,
+#        dense = partial(
+#            nn.Dense,
+#            dtype=self.dtype,
+#            kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+#        )
+#        self.query_key_value = dense(self.hidden_size * 3)
+#        self.dense = dense(self.hidden_size)
+
+        self.query_key_value = layers.DenseGeneral(
+            axis=-1,
+            features=(self.num_heads, self.head_dim * 3),
+            kernel_axes=('embed', 'heads', 'kv'),
             dtype=self.dtype,
-            kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
         )
-        self.query_key_value = dense(self.hidden_size * 3)
-        self.dense = dense(self.hidden_size)
-#        self.query_key_value = layers.DenseGeneral(
-#            axis=-1,
-#            features=(self.num_heads, self.head_dim * 3),
-#            kernel_axes=('embed', 'heads', 'kv'),
-#            dtype=self.dtype,
-#        )
-#        self.dense = layers.DenseGeneral(
-#            features=self.hidden_size,
-#            axis=(-2, -1),
-           # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
-#            kernel_axes=('heads', 'kv', 'embed'),
-#            dtype=self.dtype,
-#        )
+        self.dense = layers.DenseGeneral(
+            features=self.hidden_size,
+            axis=(-2, -1),
+          # kernel_init=jax.nn.initializers.normal(self.config.initializer_range),
+            kernel_axes=('heads', 'kv', 'embed'),
+            dtype=self.dtype,
+        )
         self.resid_dropout = nn.Dropout(rate=self.config.hidden_dropout)
 
     def _split_heads(self, hidden_states):
@@ -168,12 +169,6 @@ class FlaxBloomAttention(nn.Module):
             # Update key, value caches with our new 1d spatial slices.
             # We implement an efficient scatter into the cache via one-hot
             # broadcast and addition.
-#            if num_updated_cache_vectors > 1:
-#                indices = jnp.eye(num_updated_cache_vectors, seq_length)[None, None]
-#                key = cached_key.value + jnp.matmul(one_token_key, indices)
-#                value = cached_value.value + jnp.matmul(one_token_value, indices)
-#                import ipdb; ipdb.set_trace()
-#            else:
             one_hot_indices = jax.nn.one_hot(cur_index, seq_length, dtype=key.dtype)
             key = cached_key.value + one_token_key * one_hot_indices
             value = cached_value.value + one_token_value * one_hot_indices
@@ -211,14 +206,14 @@ class FlaxBloomAttention(nn.Module):
         fused_qkv = self.query_key_value(hidden_states)
 
         # TODO(PVP) delete following line
-        fused_qkv = self._split_heads(fused_qkv)
+        # fused_qkv = self._split_heads(fused_qkv)
 
         query, key, value = jnp.split(fused_qkv, 3, axis=-1)
 
         # TODO(PVP) - uncomment other three
-#        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
-#        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
-#        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
+        query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
+        key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
+        value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
 
         causal_attention_mask = make_causal_mask(attention_mask, dtype="bool")
 
@@ -245,6 +240,7 @@ class FlaxBloomAttention(nn.Module):
         attention_mask = jnp.broadcast_to(jnp.expand_dims(attention_mask, axis=(-3, -2)), causal_attention_mask.shape)
 
         attention_mask = causal_attention_mask
+        # only causal mask should be used when doing one-token generation
         # attention_mask = combine_masks(attention_mask, causal_attention_mask)
 
         dropout_rng = None
@@ -282,7 +278,7 @@ class FlaxBloomAttention(nn.Module):
 
         attn_output = jnp.einsum("...hqk,...khd->...qhd", attn_weights, value)
         # TODO(PVP) delete following line
-        attn_output = self._merge_heads(attn_output)
+        # attn_output = self._merge_heads(attn_output)
 
         attn_output = self.dense(attn_output)
 
