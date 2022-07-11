@@ -9,13 +9,17 @@ from jax.experimental import PartitionSpec as P
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 
-from bloom_inference import FlaxBloomForCausalLM
+from bloom_inference.modeling_bloom.modeling_bloom import FlaxBloomForCausalLM
+from bloom_inference.modeling_bloom.configuration_bloom import BloomConfig
 from transformers import AutoTokenizer
 
-ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
+# ckpt = "sanchit-gandhi/bloom-6b3-scan-t5x"
 
-model, params = FlaxBloomForCausalLM.from_pretrained(ckpt, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
-tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
+config = BloomConfig.from_pretrained("bigscience/bloom-6b3")
+
+model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-6b3", use_fast=False)
+
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
@@ -35,6 +39,7 @@ logical_axis_rules_full = [
     ('stack', None),
     ('mlp_activations', None),
 ]
+
 
 def init_fn():
     input_shape = (1, 1)
@@ -61,10 +66,14 @@ partitioner = PjitPartitioner(num_mp_partitions, logical_axis_rules=logical_axis
 mesh_axes = partitioner.get_mesh_axes(state)
 params_spec = mesh_axes.params
 
-shard_params = partitioner.partition(model.to_bf16, (params_spec,), params_spec)
+# shard_params = partitioner.partition(model.to_bf16, (params_spec,), params_spec)
+# This will auto-magically run in mesh context
+# params = shard_params(freeze(params))
+
+init_params = partitioner.partition(init_fn, None, params_spec)
 
 # This will auto-magically run in mesh context
-params = shard_params(freeze(params))
+params = init_params()
 
 def generate(params, input_ids, attention_mask):
     output_ids = model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
@@ -79,37 +88,44 @@ p_generate = partitioner.partition(
 tokenizer.padding_side = "left"
 model.config.max_length = 256
 model.config.num_beams = 1
-model.config.do_sample = False
+model.config.do_sample = True
 model.config.pad_token_id = tokenizer.pad_token_id
 
 prompt = "Reciepe for pasta with coconut:"
 inputs = tokenizer([prompt] * 8, return_tensors="jax", padding="max_length", truncation=True, max_length=64) # BS = 8
 
-print("----------------------------")
-start = time.time()
-gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
-print('Gen time:', time.time() - start)
-print(generated_text)
-print(len(generated_text))
 
-print("----------------------------")
-start = time.time()
-gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
-print('Gen time:', time.time() - start)
-print(len(generated_text))
+# print but only on the first node
+def head_print(*args, **kwargs):
+    if jax.process_index() == 0:
+        print(*args, **kwargs)
 
-print("----------------------------")
-start = time.time()
-gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
-print('Gen time:', time.time() - start)
-print(len(generated_text))
 
-print("----------------------------")
+head_print("----------------------------")
 start = time.time()
 gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
 generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
-print('Gen time:', time.time() - start)
-print(len(generated_text))
+head_print('Gen time:', time.time() - start)
+head_print(generated_text)
+head_print(len(generated_text))
+
+head_print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+head_print('Gen time:', time.time() - start)
+head_print(len(generated_text))
+
+head_print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+head_print('Gen time:', time.time() - start)
+head_print(len(generated_text))
+
+head_print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+head_print('Gen time:', time.time() - start)
+head_print(len(generated_text))
