@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 
 import jax
@@ -7,33 +9,13 @@ from jax.experimental import PartitionSpec as P
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 
-from bloom_inference import FlaxBloomForCausalLM, BloomConfig
+from bloom_inference import FlaxBloomForCausalLM
 from transformers import AutoTokenizer
 
 ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
 
-config = BloomConfig(n_layer=1)
 model, params = FlaxBloomForCausalLM.from_pretrained(ckpt, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
-
-
-# 1D parameter partitioning with 2D activation partitioning
-logical_axis_rules = [
-    ('batch', 'data'),
-    ('mlp', 'model'),
-    ('heads', 'model'),
-    ('vocab', 'model'),
-    # shard remaining activations; weight matrices already have axes mapped to 'model'
-    ('embed', 'model'),
-    ('kv', None),
-    ('joined_kv', None),
-    ('relpos_buckets', None),
-    ('abspos_buckets', None),
-    ('length', None),
-    ('layers', None),
-    ('stack', None),
-    ('mlp_activations', None),
-]
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
@@ -54,19 +36,17 @@ logical_axis_rules_full = [
     ('mlp_activations', None),
 ]
 
-
-# TODO: Add this in model init
 def init_fn():
-    input_shape = (1,1)
+    input_shape = (1, 1)
     input_ids = jnp.zeros(input_shape, dtype="i4")
     attention_mask = jnp.ones_like(input_ids)
     rng = jax.random.PRNGKey(0)
     return model.module.init(rng, input_ids, attention_mask, return_dict=False)
 
 
-param_axes = jax.eval_shape(init_fn)["params_axes"] # Axis names metadata
+param_axes = jax.eval_shape(init_fn)["params_axes"]  # Axis names metadata
 
-# create InferenceState, since the partitioner expects it. 
+# create InferenceState, since the partitioner expects it.
 state = InferenceState(
     step=jnp.array(0),
     params=freeze(model.params_shape_tree),
@@ -99,11 +79,37 @@ p_generate = partitioner.partition(
 tokenizer.padding_side = "left"
 model.config.max_length = 256
 model.config.num_beams = 1
-model.config.do_sample = True
+model.config.do_sample = False
 model.config.pad_token_id = tokenizer.pad_token_id
 
 prompt = "Reciepe for pasta with coconut:"
 inputs = tokenizer([prompt] * 8, return_tensors="jax", padding="max_length", truncation=True, max_length=64) # BS = 8
 
+print("----------------------------")
+start = time.time()
 gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
 generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+print('Gen time:', time.time() - start)
+print(generated_text)
+print(len(generated_text))
+
+print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+print('Gen time:', time.time() - start)
+print(len(generated_text))
+
+print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+print('Gen time:', time.time() - start)
+print(len(generated_text))
+
+print("----------------------------")
+start = time.time()
+gen_ids = p_generate(freeze(params), inputs["input_ids"], inputs["attention_mask"])
+generated_text = tokenizer.batch_decode(np.asarray(gen_ids), skip_special_tokens=True)
+print('Gen time:', time.time() - start)
+print(len(generated_text))

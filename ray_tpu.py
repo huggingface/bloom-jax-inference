@@ -49,9 +49,12 @@ def start_ray(conn, address):
     conn.run("sudo rm -rf *.py bloom_inference")
     # make directory of structure: bloom_inference/bloom_inference/modeling_bloom
     conn.run("mkdir bloom_inference bloom_inference/bloom_inference bloom_inference/bloom_inference/modeling_bloom -p")
-    
+
     # copy run files into bloom_inference
     for i in glob.glob("*.py"):
+        conn.put(i, "bloom_inference/")
+
+    for i in glob.glob("*.sh"):
         conn.put(i, "bloom_inference/")
 
     # copy CPU/TPU manager files into bloom_inference/bloom_inference
@@ -70,10 +73,11 @@ def start_ray(conn, address):
         conn.run("ray stop -f", hide=True)
     except:
         pass
-    
+
     time.sleep(1)
-    
+
     # run start-up script
     out = conn.run(f"bash /tmp/ray-tpu.sh {address}", hide=True)
     # display result
     print(out)
+
