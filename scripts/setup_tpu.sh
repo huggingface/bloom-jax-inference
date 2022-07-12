@@ -30,6 +30,7 @@ then
   source ~/venv/bin/activate
   # for now, reinstall bloom-jax-inference everytime
   pip install -e bloom-jax-inference/
+  pip install -U git+https://github.com/huggingface/transformers.git
 else
   echo "creating venv"
   # get application updates, 'yes' to all
