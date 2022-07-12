@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-gcloud auth activate-service-account --key-file ~/bloom_inference/key.json
-export GOOGLE_APPLICATION_CREDENTIALS=~/bloom_inference/key.json
+gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
+export GOOGLE_APPLICATION_CREDENTIALS=~/bloom-jax-inference/key.json
 
 # this locks the python executable down to hopefully stop if from being fiddled with...
 screen -d -m python -c "import time; time.sleep(999999999)"
@@ -27,8 +27,8 @@ then
     echo "venv exists"
     # activate venv (if not done so already)
     source ~/venv/bin/activate
-    # for now, reinstall bloom_inference everytime
-    pip install -e bloom_inference/
+    # for now, reinstall bloom-jax-inference everytime
+    pip install -e bloom-jax-inference/
 else
     echo "creating venv"
     # get application updates, 'yes' to all
@@ -57,5 +57,5 @@ else
     pip install "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
     
     # And finally, Flax BLOOM
-    pip install -e bloom_inference/
+    pip install -e bloom-jax-inference/
 fi
