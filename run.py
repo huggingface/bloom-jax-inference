@@ -9,16 +9,19 @@ from bloom_inference.tpu_manager import TPUManager
 
 num_mp_partitions = 8
 
-#tpu_name = "suraj-tpu-v3-32"
+# tpu_name = "suraj-tpu-v3-32"
 # tpu_name = "patrick-tpu-v3-32"
 # region = "europe-west4-a"
-tpu_name="bloom-tpu-v4-64"
-region="us-central2-b"
+tpu_name = "dalle-pod"
+region = "us-east1-d"
+project = "dall-e-mega"
 
-ckpt = "bigscience/bloom-6b3",
-t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
-max_len = 256,
-max_input_len = 64,
+ckpt = "bigscience/bloom-6b3"
+# t5x_path = "gs://suraj-tpu-bucket/bloom-6b3-scan-t5x-v3-8-pretrained/checkpoint_0"
+t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0"
+max_len = 256
+max_input_len = 64
+# model_parallel_submesh = (1, 16, 1, 2)  # for v3-256
 model_parallel_submesh = (1, 2, 4, 1), # for v4-64
 
 
