@@ -2,7 +2,7 @@ import numpy as np
 import jax
 import time
 
-from bloom_inference import FlaxBloomForCausalLM, BloomConfig
+from bloom_inference.modeling_bloom import FlaxBloomForCausalLM, BloomConfig
 from transformers import AutoTokenizer
 
 from flax.training.common_utils import shard
