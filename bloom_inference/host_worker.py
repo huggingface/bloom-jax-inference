@@ -57,13 +57,13 @@ class TPUHostWorker(object):
         head_print("Loading complete")
 
         while True:
-            operation, prompts = self.input_q.get()
+            operation, inputs = self.input_q.get()
             if operation == "generate":
-                generated_text = generator.generate(prompts)
+                generated_text = generator.generate(inputs)
                 self.output_q.put(generated_text)
             else:
                 raise Exception("Not implemented")
 
-    def generate(self, input):
-        self.input_q.put(("generate", input))
+    def generate(self, inputs):
+        self.input_q.put(("generate", inputs))
         return self.output_q.get()
