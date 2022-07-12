@@ -11,6 +11,8 @@ from t5x.checkpoints import Checkpointer
 from bloom_inference.modeling_bloom import FlaxBloomForCausalLM, BloomConfig
 from transformers import AutoTokenizer
 
+jax.config.update('jax_parallel_functions_output_gda', True)
+
 ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
 
 config = BloomConfig(n_layer=1)
