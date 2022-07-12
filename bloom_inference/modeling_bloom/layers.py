@@ -77,6 +77,7 @@ def variance_scaling(scale, mode, distribution, in_axis=-2, out_axis=-1,
   """Inlined JAX `nn.initializer.variance_scaling`."""
 
   def init(key, shape, dtype=dtype):
+    return jnp.zeros(shape, dtype=dtype)
     dtype = jax.dtypes.canonicalize_dtype(dtype)
     shape = jax.core.as_named_shape(shape)
     fan_in, fan_out = _compute_fans(shape, in_axis, out_axis)
@@ -414,7 +415,8 @@ class DenseGeneral(nn.Module):
   features: Union[Iterable[int], int]
   axis: Union[Iterable[int], int] = -1
   dtype: DType = jnp.float32
-  kernel_init: NdInitializer = nd_dense_init(1.0, 'fan_in', 'truncated_normal')
+  params_dtype: DType = jnp.float32
+  kernel_init: NdInitializer = nd_dense_init(1.0, 'fan_in', 'normal')
   kernel_axes: Tuple[str, ...] = ()
   use_bias: bool = True
   bias_init: Any = nn.initializers.zeros
@@ -442,12 +444,12 @@ class DenseGeneral(nn.Module):
         'kernel',
         self.kernel_init,
         kernel_shape,
-        jnp.float32,
+        self.params_dtype,
         kernel_in_axis,
         kernel_out_axis,
         axes=self.kernel_axes)
     if self.use_bias:
-        bias = param_with_axes('bias', self.bias_init, features, jnp.float32, axes=(self.kernel_axes[-1],))
+        bias = param_with_axes('bias', self.bias_init, features, self.params_dtype, axes=(self.kernel_axes[-1],))
     kernel = jnp.asarray(kernel, self.dtype)
 
     contract_ind = tuple(range(0, len(axis)))
@@ -541,16 +543,17 @@ class Embed(nn.Module):
   features: int
   cast_input_dtype: Optional[DType] = None
   dtype: DType = jnp.float32
+  params_dtype: DType = jnp.float32
   attend_dtype: Optional[DType] = None
   embedding_init: Initializer = default_embed_init
-  one_hot: bool = False
+  one_hot: bool = True
   embedding: Array = dataclasses.field(init=False)
 
   def setup(self):
     self.embedding = param_with_axes(
         'embedding',
         self.embedding_init, (self.num_embeddings, self.features),
-        jnp.float32,
+        self.params_dtype,
         axes=('vocab', 'embed'))
 
   def __call__(self, inputs: Array) -> Array:
@@ -751,6 +754,7 @@ class LayerNorm(nn.Module):
   """
   epsilon: float = 1e-6
   dtype: Any = jnp.float32
+  params_dtype: DType = jnp.float32
   use_bias: bool = True
   use_scale: bool = True
   bias_init: Callable[[PRNGKey, Shape, Any], Array] = nn.initializers.zeros
@@ -771,11 +775,11 @@ class LayerNorm(nn.Module):
     var = mean2 - lax.square(mean)
     mul = lax.rsqrt(var + self.epsilon)
     if self.use_scale:
-        scale = param_with_axes('scale', self.scale_init, (features,), jnp.float32, axes=('embed',))
+        scale = param_with_axes('scale', self.scale_init, (features,), self.params_dtype, axes=('embed',))
         mul = mul * jnp.asarray(scale, self.dtype)
     y = (x - mean) * mul
     if self.use_bias:
-        bias = param_with_axes('bias', self.bias_init, (features,), jnp.float32, axes=('embed',))
+        bias = param_with_axes('bias', self.bias_init, (features,), self.params_dtype, axes=('embed',))
         y = y + jnp.asarray(bias, self.dtype)
     return jnp.asarray(y, self.dtype)
 
