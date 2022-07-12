@@ -36,7 +36,8 @@ else
   cd transformers
   pip install -e ."[flax]"
   cd ..
-  pip install flatbuffers=1.12
+  # pin flatbuffers to comply with tensorflow
+  pip install flatbuffers==1.12
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
   cd t5x
