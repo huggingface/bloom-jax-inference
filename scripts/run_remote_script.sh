@@ -1,12 +1,9 @@
 #!/bin/bash
 
-# INSTANCE=bloom-tpu-v4-64
-# ZONE=us-central2-b
-
-INSTANCE=$1
-SCRIPT=$2
-PROJECT=huggingface-ml
+INSTANCE=bloom-tpu-v4-64
 ZONE=us-central2-b
+PROJECT=huggingface-ml
+SCRIPT=$1
 
 # run script.bash through run_script.bash
 gcloud alpha compute tpus tpu-vm ssh $INSTANCE --project=$PROJECT --zone=$ZONE \
