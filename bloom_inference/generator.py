@@ -21,10 +21,12 @@ warnings.filterwarnings("ignore", category=ResourceWarning)
 if jax.process_index() == 0:
     warnings.filterwarnings("default")
 
+
 # print but only on the first node
 def head_print(*args, **kwargs):
     if jax.process_index() == 0:
         print(*args, **kwargs)
+
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
@@ -60,22 +62,22 @@ class Generator:
         self.path = t5x_path
         self.max_len = max_len
         self.max_input_len = max_input_len
+        self.model_parallel_submesh = model_parallel_submesh
 
         config = BloomConfig.from_pretrained(ckpt, max_length=max_len, do_sample=True, num_beams=1, top_p=0.9)
         self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 
         def init_state():
-            input_shape = (1,1)
+            input_shape = (1, 1)
             input_ids = jnp.zeros(input_shape, dtype="i4")
             attention_mask = jnp.ones_like(input_ids)
             rng = jax.random.PRNGKey(0)
             initial_vars = self.model.module.init(rng, input_ids, attention_mask, return_dict=False)
             return InferenceState.create(initial_vars)
-        
+
         state_shapes = jax.eval_shape(init_state)
-        model_parallel_submesh = (1, 2, 4, 1)
         self.partitioner = PjitPartitioner(
-            model_parallel_submesh=model_parallel_submesh,
+            model_parallel_submesh=self.model_parallel_submesh,
             logical_axis_rules=logical_axis_rules_full
         )
         self.params_spec = self.partitioner.get_mesh_axes(state_shapes).params
@@ -86,7 +88,7 @@ class Generator:
             self.partitioner,
             self.path,
             use_gda=True,
-            restore_dtype=jnp.bfloat16, 
+            restore_dtype=jnp.bfloat16,
             save_dtype=jnp.bfloat16
         )
 
@@ -107,7 +109,8 @@ class Generator:
         )
 
     def generate(self, prompts):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=self.max_input_len)
+        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True,
+                                max_length=self.max_input_len)
         # This will auto-magically run in mesh context
         gen_ids = self.p_generate(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
 
