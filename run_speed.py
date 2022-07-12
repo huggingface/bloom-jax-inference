@@ -15,7 +15,7 @@ from transformers import AutoTokenizer
 
 # create a parser to get ckpt, path, max_len, input_len
 parser = argparse.ArgumentParser()
-parser.add_argument("--ckpt", type=str, default="huggingface/bloom")
+parser.add_argument("--ckpt", type=str, default="bigscience/bloom")
 parser.add_argument("--t5x_path", type=str, default="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0")
 parser.add_argument("--max_len", type=int, default=100)
 parser.add_argument("--input_len", type=int, default=10)
