@@ -10,8 +10,17 @@ from bloom_inference.tpu_manager import TPUManager
 num_mp_partitions = 8
 
 #tpu_name = "suraj-tpu-v3-32"
-tpu_name = "patrick-tpu-v3-32"
-region = "europe-west4-a"
+# tpu_name = "patrick-tpu-v3-32"
+# region = "europe-west4-a"
+tpu_name="bloom-tpu-v4-64"
+region="us-central2-b"
+
+ckpt = "bigscience/bloom-6b3",
+t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
+max_len = 256,
+max_input_len = 64,
+model_parallel_submesh = (1, 2, 4, 1), # for v4-64
+
 
 # get Python list of TPU hosts
 conns = get_connection(tpu_name, region)
@@ -24,7 +33,14 @@ with pool.ThreadPool(processes=len(conns)) as p:
     p.map(functools.partial(start_ray, address=address), conns)
 
 # initialise TPU manager
-t = TPUManager(num_mp_partitions, len(conns))
+t = TPUManager(
+    len(conns),
+    ckpt=ckpt,
+    t5x_path=t5x_path,
+    max_len=max_len,
+    max_input_len=max_input_len,
+    model_parallel_submesh=model_parallel_submesh,
+)
 
 # benchmark compile step
 start = time.time()
