@@ -9,7 +9,7 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 #rm -rf ~/t5x
 #rm -rf ~/.cache/pip
 
-if [[ -d ~/bloom-jax-inference]];
+if [ -d ~/bloom-jax-inference ];
 then
     pushd ~/bloom-jax-inference
     git pull
