@@ -44,12 +44,12 @@ def init_manager():
 # # benchmark compile step
 # start = time.time()
 # print(t.generate(4*['Recipe for coconut pasta:']))
-# print(f"Generations completed in ***REMOVED***time.time() - start:.06***REMOVED***s")
+# print(f"Generations completed in {time.time() - start:.06}s")
 
 # # benchmark generate
 # start = time.time()
 # print(t.generate(4*['Recipe for coconut pasta:']))
-# print(f"Generations completed in ***REMOVED***time.time() - start:.06***REMOVED***s")
+# print(f"Generations completed in {time.time() - start:.06}s")
 
 # # shutdown ray rpc
 # ray.shutdown()

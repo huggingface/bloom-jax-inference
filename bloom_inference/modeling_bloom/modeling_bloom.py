@@ -95,8 +95,8 @@ class FlaxBloomAttention(nn.Module):
 
         if self.head_dim * self.num_heads != self.hidden_size:
             raise ValueError(
-                f"`hidden_size` must be divisible by `num_heads` (got `hidden_size`: ***REMOVED***self.hidden_size***REMOVED*** and "
-                f"`num_heads`: ***REMOVED***self.num_heads***REMOVED***)."
+                f"`hidden_size` must be divisible by `num_heads` (got `hidden_size`: {self.hidden_size} and "
+                f"`num_heads`: {self.num_heads})."
             )
 
         self.query_key_value = layers.DenseGeneral(
@@ -139,7 +139,7 @@ class FlaxBloomAttention(nn.Module):
             num_updated_cache_vectors = query.shape[1]
             expected_shape = (batch_size, 1, num_heads, head_dim)
             if num_updated_cache_vectors == 1 and expected_shape != query.shape:
-                raise ValueError(f"Autoregressive cache shape error, expected query shape ***REMOVED***expected_shape***REMOVED*** instead got ***REMOVED***query.shape***REMOVED***")
+                raise ValueError(f"Autoregressive cache shape error, expected query shape {expected_shape} instead got {query.shape}")
 
             # Create a OHE of the current index. NOTE: the index is increased below.
             cur_index = cache_index.value
@@ -435,7 +435,7 @@ class FlaxBloomPreTrainedModel(FlaxPreTrainedModel):
         input_ids = jnp.zeros(input_shape, dtype="i4")
         attention_mask = jnp.ones_like(input_ids)
         params_rng, dropout_rng = jax.random.split(rng)
-        rngs = ***REMOVED***"params": params_rng, "dropout": dropout_rng***REMOVED***
+        rngs = {"params": params_rng, "dropout": dropout_rng}
 
         random_params = self.module.init(rngs, input_ids, attention_mask, return_dict=False)["params"]
 
@@ -491,11 +491,11 @@ class FlaxBloomPreTrainedModel(FlaxPreTrainedModel):
             attention_mask = jnp.ones((batch_size, sequence_length))
 
         # Handle any PRNG if needed
-        rngs = ***REMOVED******REMOVED***
+        rngs = {}
         if dropout_rng is not None:
             rngs["dropout"] = dropout_rng
 
-        inputs = ***REMOVED***"params": params or self.params***REMOVED***
+        inputs = {"params": params or self.params}
 
         # if past_key_values are passed then cache is already initialized a private flag init_cache has to be passed down to ensure cache is used. It has to be made sure that cache is marked as mutable so that it can be changed by FlaxBloomAttention module
         if past_key_values:
@@ -559,8 +559,8 @@ class FlaxBloomBlockCollection(nn.Module):
 
             hidden_states, _ = scan_with_axes(
                 FlaxBloomBlock,
-                variable_axes=***REMOVED***"params": 0, "cache": 0***REMOVED***,
-                split_rngs=***REMOVED***"params": True, "dropout": True***REMOVED***,
+                variable_axes={"params": 0, "cache": 0},
+                split_rngs={"params": True, "dropout": True},
                 in_axes=(nn.broadcast, nn.broadcast, 0, nn.broadcast, nn.broadcast),
                 length=self.config.num_hidden_layers,
             )(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=True, name="FlaxBloomBlockLayers")(
@@ -719,7 +719,7 @@ class FlaxBloomForCausalLMModule(nn.Module):
 
         if self.config.tie_word_embeddings:
             shared_kernel = self.transformer.variables["params"]["word_embeddings"]["embedding"].T
-            lm_logits = self.lm_head.apply(***REMOVED***"params": ***REMOVED***"kernel": shared_kernel***REMOVED******REMOVED***, hidden_states)
+            lm_logits = self.lm_head.apply({"params": {"kernel": shared_kernel}}, hidden_states)
         else:
             lm_logits = self.lm_head(hidden_states)
 
@@ -745,10 +745,10 @@ class FlaxBloomForCausalLM(FlaxBloomPreTrainedModel):
         if attention_mask is not None:
             extended_attention_mask = lax.dynamic_update_slice(extended_attention_mask, attention_mask, (0, 0))
 
-        return ***REMOVED***
+        return {
             "past_key_values": past_key_values,
             "attention_mask": extended_attention_mask,
-        ***REMOVED***
+        }
 
     def update_inputs_for_generation(self, model_outputs, model_kwargs):
         model_kwargs["past_key_values"] = model_outputs.past_key_values

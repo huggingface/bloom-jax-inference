@@ -62,7 +62,7 @@ p_shard_params = partitioner.partition(model.to_bf16, (params_spec,), params_spe
 params = p_shard_params(freeze(params))
 
 # create frozen dict of model variables (params, params_axes), expected format of the .create method of InferenceState
-model_variables = freeze(***REMOVED***'params': params, 'params_axes': state_shapes.params_axes***REMOVED***)
+model_variables = freeze({'params': params, 'params_axes': state_shapes.params_axes})
 
 # create InferenceState in .create method format (takes care of all attributes)
 # TODO: flax_mutables & flax_mutables_axes required?

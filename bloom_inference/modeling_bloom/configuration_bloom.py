@@ -19,14 +19,14 @@ from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
 
-BLOOM_PRETRAINED_CONFIG_ARCHIVE_MAP = ***REMOVED***
+BLOOM_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "bigscience/bloom": "https://huggingface.co/bigscience/bloom/resolve/main/config.json",
     "bigscience/bloom-350m": "https://huggingface.co/bigscience/bloom-350m/blob/main/config.json",
     "bigscience/bloom-760m": "https://huggingface.co/bigscience/bloom-760m/blob/main/config.json",
     "bigscience/bloom-1b3": "https://huggingface.co/bigscience/bloom-1b3/blob/main/config.json",
     "bigscience/bloom-2b5": "https://huggingface.co/bigscience/bloom-2b5/blob/main/config.json",
     "bigscience/bloom-6b3": "https://huggingface.co/bigscience/bloom-6b3/blob/main/config.json",
-***REMOVED***
+}
 
 
 class BloomConfig(PretrainedConfig):
@@ -103,12 +103,12 @@ class BloomConfig(PretrainedConfig):
 
     model_type = "bloom"
     keys_to_ignore_at_inference = ["past_key_values"]
-    attribute_map = ***REMOVED***
+    attribute_map = {
         "num_hidden_layers": "n_layer",
         "n_head": "num_attention_heads",
         "hidden_size": "n_embed",
         "dtype": "torch_dtype",
-    ***REMOVED***
+    }
 
     def __init__(
         self,

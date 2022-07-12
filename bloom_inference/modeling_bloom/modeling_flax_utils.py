@@ -68,14 +68,14 @@ def quick_gelu(x):
     return x * jax.nn.sigmoid(1.702 * x)
 
 
-ACT2FN = ***REMOVED***
+ACT2FN = {
     "gelu": partial(nn.gelu, approximate=False),
     "relu": nn.relu,
     "silu": nn.swish,
     "swish": nn.swish,
     "gelu_new": partial(nn.gelu, approximate=True),
     "quick_gelu": quick_gelu,
-***REMOVED***
+}
 
 
 def dtype_byte_size(dtype):
@@ -90,7 +90,7 @@ def dtype_byte_size(dtype):
         return 1 / 8
     bit_search = re.search("[^\d](\d+)$", dtype.name)
     if bit_search is None:
-        raise ValueError(f"`dtype` is not a valid dtype: ***REMOVED***dtype***REMOVED***.")
+        raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
     bit_size = int(bit_search.groups()[0])
     return bit_size // 8
 
@@ -103,7 +103,7 @@ def flax_shard_checkpoint(params, max_shard_size="10GB"):
     example, if the limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as
     [6GB], [6+2GB], [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
 
-    <Tip warning=***REMOVED***true***REMOVED***>
+    <Tip warning={true}>
 
     If one of the model's weight is bigger that `max_shard_size`, it will end up in its own sub-checkpoint which will
     have a size greater than `max_shard_size`.
@@ -119,7 +119,7 @@ def flax_shard_checkpoint(params, max_shard_size="10GB"):
     max_shard_size = convert_file_size_to_int(max_shard_size)
 
     sharded_state_dicts = []
-    current_block = ***REMOVED******REMOVED***
+    current_block = {}
     current_block_size = 0
     total_size = 0
 
@@ -131,7 +131,7 @@ def flax_shard_checkpoint(params, max_shard_size="10GB"):
         # If this weight is going to tip up over the maximal size, we split.
         if current_block_size + weight_size > max_shard_size:
             sharded_state_dicts.append(current_block)
-            current_block = ***REMOVED******REMOVED***
+            current_block = {}
             current_block_size = 0
 
         current_block[item] = weights[item]
@@ -143,20 +143,20 @@ def flax_shard_checkpoint(params, max_shard_size="10GB"):
 
     # If we only have one shard, we return it
     if len(sharded_state_dicts) == 1:
-        return ***REMOVED***FLAX_WEIGHTS_NAME: sharded_state_dicts[0]***REMOVED***, None
+        return {FLAX_WEIGHTS_NAME: sharded_state_dicts[0]}, None
 
     # Otherwise, let's build the index
-    weight_map = ***REMOVED******REMOVED***
-    shards = ***REMOVED******REMOVED***
+    weight_map = {}
+    shards = {}
     for idx, shard in enumerate(sharded_state_dicts):
-        shard_file = FLAX_WEIGHTS_NAME.replace(".msgpack", f"-***REMOVED***idx+1:05d***REMOVED***-of-***REMOVED***len(sharded_state_dicts):05d***REMOVED***.msgpack")
+        shard_file = FLAX_WEIGHTS_NAME.replace(".msgpack", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.msgpack")
         shards[shard_file] = shard
         for weight_name in shard.keys():
             weight_map[weight_name] = shard_file
 
     # Add the metadata
-    metadata = ***REMOVED***"total_size": total_size***REMOVED***
-    index = ***REMOVED***"metadata": metadata, "weight_map": weight_map***REMOVED***
+    metadata = {"total_size": total_size}
+    index = {"metadata": metadata, "weight_map": weight_map}
     return shards, index
 
 
@@ -219,7 +219,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
             logger.info(
                 "Model weights are not initialized as `_do_init` is set to `False`. "
-                f"Make sure to call `***REMOVED***self.__class__.__name__***REMOVED***.init_weights` manually to initialize the weights."
+                f"Make sure to call `{self.__class__.__name__}.init_weights` manually to initialize the weights."
             )
 
         # get the shape of the parameters
@@ -233,10 +233,10 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
             self.params = random_params
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> Dict:
-        raise NotImplementedError(f"init method has to be implemented for ***REMOVED***self***REMOVED***")
+        raise NotImplementedError(f"init method has to be implemented for {self}")
 
     def enable_gradient_checkpointing(self):
-        raise NotImplementedError(f"gradient checkpointing method has to be implemented for ***REMOVED***self***REMOVED***")
+        raise NotImplementedError(f"gradient checkpointing method has to be implemented for {self}")
 
     @classmethod
     def _from_config(cls, config, **kwargs):
@@ -293,7 +293,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         if len(self.required_params - param_keys) > 0:
             raise ValueError(
                 "Some parameters are missing. Make sure that `params` include the following "
-                f"parameters ***REMOVED***self.required_params - param_keys***REMOVED***"
+                f"parameters {self.required_params - param_keys}"
             )
         self._params = params
 
@@ -351,10 +351,10 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
         >>> model = FlaxBertModel.from_pretrained("bert-base-cased")
         >>> flat_params = traverse_util.flatten_dict(model.params)
-        >>> mask = ***REMOVED***
+        >>> mask = {
         ...     path: (path[-2] != ("LayerNorm", "bias") and path[-2:] != ("LayerNorm", "scale"))
         ...     for path in flat_params
-        ... ***REMOVED***
+        ... }
         >>> mask = traverse_util.unflatten_dict(mask)
         >>> model.params = model.to_bf16(model.params, mask)
         ```"""
@@ -417,10 +417,10 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
         >>> model = FlaxBertModel.from_pretrained("bert-base-cased")
         >>> flat_params = traverse_util.flatten_dict(model.params)
-        >>> mask = ***REMOVED***
+        >>> mask = {
         ...     path: (path[-2] != ("LayerNorm", "bias") and path[-2:] != ("LayerNorm", "scale"))
         ...     for path in flat_params
-        ... ***REMOVED***
+        ... }
         >>> mask = traverse_util.unflatten_dict(mask)
         >>> model.params = model.to_fp16(model.params, mask)
         ```"""
@@ -440,8 +440,8 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 The list of shard files to load.
 
         Returns:
-            `Dict`: A nested dictionary of the model parameters, in the expected format for flax models : `***REMOVED***'model':
-            ***REMOVED***'params': ***REMOVED***'...'***REMOVED******REMOVED******REMOVED***`.
+            `Dict`: A nested dictionary of the model parameters, in the expected format for flax models : `{'model':
+            {'params': {'...'}}}`.
         """
 
         # Load the index
@@ -463,7 +463,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                     else:
                         raise ValueError from e
             except (UnicodeDecodeError, ValueError):
-                raise EnvironmentError(f"Unable to convert ***REMOVED***shard_file***REMOVED*** to Flax deserializable object. ")
+                raise EnvironmentError(f"Unable to convert {shard_file} to Flax deserializable object. ")
 
             state = flatten_dict(state, sep="/")
             state_sharded_dict.update(state)
@@ -549,8 +549,8 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 Whether or not to delete incompletely received files. Will attempt to resume the download if such a
                 file exists.
             proxies (`Dict[str, str]`, *optional*):
-                A dictionary of proxy servers to use by protocol or endpoint, e.g., `***REMOVED***'http': 'foo.bar:3128',
-                'http://hostname': 'foo.bar:4012'***REMOVED***`. The proxies are used on each request.
+                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
+                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
             local_files_only(`bool`, *optional*, defaults to `False`):
                 Whether or not to only look at local files (i.e., do not try to download the model).
             revision (`str`, *optional*, defaults to `"main"`):
@@ -598,7 +598,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         from_auto_class = kwargs.pop("_from_auto", False)
         _do_init = kwargs.pop("_do_init", True)
 
-        user_agent = ***REMOVED***"file_type": "model", "framework": "flax", "from_auto_class": from_auto_class***REMOVED***
+        user_agent = {"file_type": "model", "framework": "flax", "from_auto_class": from_auto_class}
         if from_pipeline is not None:
             user_agent["using_pipeline"] = from_pipeline
 
@@ -649,14 +649,14 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 # At this stage we don't have a weight file so we will raise an error.
                 elif os.path.join(pretrained_model_name_or_path, WEIGHTS_NAME):
                     raise EnvironmentError(
-                        f"Error no file named ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** found in directory ***REMOVED***pretrained_model_name_or_path***REMOVED*** "
+                        f"Error no file named {FLAX_WEIGHTS_NAME} found in directory {pretrained_model_name_or_path} "
                         "but there is a file for PyTorch weights. Use `from_pt=True` to load this model from those "
                         "weights."
                     )
                 else:
                     raise EnvironmentError(
-                        f"Error no file named ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** or ***REMOVED***WEIGHTS_NAME***REMOVED*** found in directory "
-                        f"***REMOVED***pretrained_model_name_or_path***REMOVED***."
+                        f"Error no file named {FLAX_WEIGHTS_NAME} or {WEIGHTS_NAME} found in directory "
+                        f"{pretrained_model_name_or_path}."
                     )
             elif os.path.isfile(pretrained_model_name_or_path) or is_remote_url(pretrained_model_name_or_path):
                 archive_file = pretrained_model_name_or_path
@@ -684,16 +684,16 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
             except RepositoryNotFoundError:
                 raise EnvironmentError(
-                    f"***REMOVED***pretrained_model_name_or_path***REMOVED*** is not a local folder and is not a valid model identifier "
+                    f"{pretrained_model_name_or_path} is not a local folder and is not a valid model identifier "
                     "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to pass a "
                     "token having permission to this repo with `use_auth_token` or log in with `huggingface-cli "
                     "login` and pass `use_auth_token=True`."
                 )
             except RevisionNotFoundError:
                 raise EnvironmentError(
-                    f"***REMOVED***revision***REMOVED*** is not a valid git identifier (branch name, tag name or commit id) that exists for "
+                    f"{revision} is not a valid git identifier (branch name, tag name or commit id) that exists for "
                     "this model name. Check the model page at "
-                    f"'https://huggingface.co/***REMOVED***pretrained_model_name_or_path***REMOVED***' for available revisions."
+                    f"'https://huggingface.co/{pretrained_model_name_or_path}' for available revisions."
                 )
             except EntryNotFoundError:
                 if filename == FLAX_WEIGHTS_NAME:
@@ -716,47 +716,47 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                         )
                         is_sharded = True
                     except EntryNotFoundError:
-                        has_file_kwargs = ***REMOVED***"revision": revision, "proxies": proxies, "use_auth_token": use_auth_token***REMOVED***
+                        has_file_kwargs = {"revision": revision, "proxies": proxies, "use_auth_token": use_auth_token}
                         if has_file(pretrained_model_name_or_path, WEIGHTS_NAME, **has_file_kwargs):
                             raise EnvironmentError(
-                                f"***REMOVED***pretrained_model_name_or_path***REMOVED*** does not appear to have a file named"
-                                f" ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** but there is a file for PyTorch weights. Use `from_pt=True` to"
+                                f"{pretrained_model_name_or_path} does not appear to have a file named"
+                                f" {FLAX_WEIGHTS_NAME} but there is a file for PyTorch weights. Use `from_pt=True` to"
                                 " load this model from those weights."
                             )
                         else:
                             raise EnvironmentError(
-                                f"***REMOVED***pretrained_model_name_or_path***REMOVED*** does not appear to have a file named"
-                                f" ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** or ***REMOVED***WEIGHTS_NAME***REMOVED***."
+                                f"{pretrained_model_name_or_path} does not appear to have a file named"
+                                f" {FLAX_WEIGHTS_NAME} or {WEIGHTS_NAME}."
                             )
                 else:
                     raise EnvironmentError(
-                        f"***REMOVED***pretrained_model_name_or_path***REMOVED*** does not appear to have a file named ***REMOVED***filename***REMOVED***."
+                        f"{pretrained_model_name_or_path} does not appear to have a file named {filename}."
                     )
             except HTTPError as err:
                 raise EnvironmentError(
-                    f"There was a specific connection error when trying to load ***REMOVED***pretrained_model_name_or_path***REMOVED***:\n"
-                    f"***REMOVED***err***REMOVED***"
+                    f"There was a specific connection error when trying to load {pretrained_model_name_or_path}:\n"
+                    f"{err}"
                 )
             except ValueError:
                 raise EnvironmentError(
-                    f"We couldn't connect to '***REMOVED***HUGGINGFACE_CO_RESOLVE_ENDPOINT***REMOVED***' to load this model, couldn't find it"
-                    f" in the cached files and it looks like ***REMOVED***pretrained_model_name_or_path***REMOVED*** is not the path to a"
-                    f" directory containing a file named ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** or ***REMOVED***WEIGHTS_NAME***REMOVED***.\nCheckout your"
+                    f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load this model, couldn't find it"
+                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
+                    f" directory containing a file named {FLAX_WEIGHTS_NAME} or {WEIGHTS_NAME}.\nCheckout your"
                     " internet connection or see how to run the library in offline mode at"
                     " 'https://huggingface.co/docs/transformers/installation#offline-mode'."
                 )
             except EnvironmentError:
                 raise EnvironmentError(
-                    f"Can't load the model for '***REMOVED***pretrained_model_name_or_path***REMOVED***'. If you were trying to load it from "
+                    f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
                     "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '***REMOVED***pretrained_model_name_or_path***REMOVED***' is the correct path to a directory "
-                    f"containing a file named ***REMOVED***FLAX_WEIGHTS_NAME***REMOVED*** or ***REMOVED***WEIGHTS_NAME***REMOVED***."
+                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
+                    f"containing a file named {FLAX_WEIGHTS_NAME} or {WEIGHTS_NAME}."
                 )
 
             if resolved_archive_file == archive_file:
-                logger.info(f"loading weights file ***REMOVED***archive_file***REMOVED***")
+                logger.info(f"loading weights file {archive_file}")
             else:
-                logger.info(f"loading weights file ***REMOVED***archive_file***REMOVED*** from cache at ***REMOVED***resolved_archive_file***REMOVED***")
+                logger.info(f"loading weights file {archive_file} from cache at {resolved_archive_file}")
         else:
             resolved_archive_file = None
 
@@ -801,7 +801,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                             else:
                                 raise ValueError from e
                     except (UnicodeDecodeError, ValueError):
-                        raise EnvironmentError(f"Unable to convert ***REMOVED***archive_file***REMOVED*** to Flax deserializable object. ")
+                        raise EnvironmentError(f"Unable to convert {archive_file} to Flax deserializable object. ")
             # make sure all arrays are stored as jnp.arrays
             # NOTE: This is to prevent a bug this will be fixed in Flax >= v0.3.4:
             # https://github.com/google/flax/issues/1261
@@ -818,7 +818,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         # if model is head model and we are loading weights from base model
         # we initialize new params dict with base_model_prefix
         if cls.base_model_prefix in dict(model.params_shape_tree) and cls.base_model_prefix not in state:
-            state = ***REMOVED***cls.base_model_prefix: state***REMOVED***
+            state = {cls.base_model_prefix: state}
 
         # flatten dicts
         state = flatten_dict(state)
@@ -830,7 +830,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
         if missing_keys and not _do_init:
             logger.warning(
-                f"The checkpoint ***REMOVED***pretrained_model_name_or_path***REMOVED*** is missing required keys: ***REMOVED***missing_keys***REMOVED***. "
+                f"The checkpoint {pretrained_model_name_or_path} is missing required keys: {missing_keys}. "
                 "Make sure to call model.init_weights to initialize the missing weights."
             )
             cls._missing_keys = missing_keys
@@ -845,8 +845,8 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                     state[key] = random_state[key]
                 else:
                     raise ValueError(
-                        f"Trying to load the pretrained weight for ***REMOVED***key***REMOVED*** failed: checkpoint has shape "
-                        f"***REMOVED***state[key].shape***REMOVED*** which is incompatible with the model shape ***REMOVED***random_state[key].shape***REMOVED***. "
+                        f"Trying to load the pretrained weight for {key} failed: checkpoint has shape "
+                        f"{state[key].shape} which is incompatible with the model shape {random_state[key].shape}. "
                         "Using `ignore_mismatched_sizes=True` if you really want to load this checkpoint inside this "
                         "model."
                     )
@@ -862,41 +862,41 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
 
         if len(unexpected_keys) > 0:
             logger.warning(
-                f"Some weights of the model checkpoint at ***REMOVED***pretrained_model_name_or_path***REMOVED*** were not used when"
-                f" initializing ***REMOVED***model.__class__.__name__***REMOVED***: ***REMOVED***unexpected_keys***REMOVED***\n- This IS expected if you are"
-                f" initializing ***REMOVED***model.__class__.__name__***REMOVED*** from the checkpoint of a model trained on another task or"
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
                 " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
                 " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
-                f" ***REMOVED***model.__class__.__name__***REMOVED*** from the checkpoint of a model that you expect to be exactly identical"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
                 " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
             )
         else:
-            logger.info(f"All model checkpoint weights were used when initializing ***REMOVED***model.__class__.__name__***REMOVED***.\n")
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
 
         if len(missing_keys) > 0:
             logger.warning(
-                f"Some weights of ***REMOVED***model.__class__.__name__***REMOVED*** were not initialized from the model checkpoint at"
-                f" ***REMOVED***pretrained_model_name_or_path***REMOVED*** and are newly initialized: ***REMOVED***missing_keys***REMOVED***\nYou should probably"
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
                 " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
             )
         elif len(mismatched_keys) == 0:
             logger.info(
-                f"All the weights of ***REMOVED***model.__class__.__name__***REMOVED*** were initialized from the model checkpoint at"
-                f" ***REMOVED***pretrained_model_name_or_path***REMOVED***.\nIf your task is similar to the task the model of the checkpoint"
-                f" was trained on, you can already use ***REMOVED***model.__class__.__name__***REMOVED*** for predictions without further"
+                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
                 " training."
             )
         if len(mismatched_keys) > 0:
             mismatched_warning = "\n".join(
                 [
-                    f"- ***REMOVED***key***REMOVED***: found shape ***REMOVED***shape1***REMOVED*** in the checkpoint and ***REMOVED***shape2***REMOVED*** in the model instantiated"
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
                     for key, shape1, shape2 in mismatched_keys
                 ]
             )
             logger.warning(
-                f"Some weights of ***REMOVED***model.__class__.__name__***REMOVED*** were not initialized from the model checkpoint at"
-                f" ***REMOVED***pretrained_model_name_or_path***REMOVED*** and are newly initialized because the shapes did not"
-                f" match:\n***REMOVED***mismatched_warning***REMOVED***\nYou should probably TRAIN this model on a down-stream task to be able"
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
+                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
                 " to use it for predictions and inference."
             )
 
@@ -909,16 +909,16 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         # raise a warning if any of the parameters are not in jnp.float32
         if len(fp16_params) > 0:
             logger.warning(
-                f"Some of the weights of ***REMOVED***model.__class__.__name__***REMOVED*** were initialized in float16 precision from "
-                f"the model checkpoint at ***REMOVED***pretrained_model_name_or_path***REMOVED***:\n***REMOVED***fp16_params***REMOVED***\n"
+                f"Some of the weights of {model.__class__.__name__} were initialized in float16 precision from "
+                f"the model checkpoint at {pretrained_model_name_or_path}:\n{fp16_params}\n"
                 "You should probably UPCAST the model weights to float32 if this was not intended. "
                 "See [`~FlaxPreTrainedModel.to_fp32`] for further information on how to do this."
             )
 
         if len(bf16_params) > 0:
             logger.warning(
-                f"Some of the weights of ***REMOVED***model.__class__.__name__***REMOVED*** were initialized in bfloat16 precision from "
-                f"the model checkpoint at ***REMOVED***pretrained_model_name_or_path***REMOVED***:\n***REMOVED***bf16_params***REMOVED***\n"
+                f"Some of the weights of {model.__class__.__name__} were initialized in bfloat16 precision from "
+                f"the model checkpoint at {pretrained_model_name_or_path}:\n{bf16_params}\n"
                 "You should probably UPCAST the model weights to float32 if this was not intended. "
                 "See [`~FlaxPreTrainedModel.to_fp32`] for further information on how to do this."
             )
@@ -943,7 +943,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
             push_to_hub (`bool`, *optional*, defaults to `False`):
                 Whether or not to push your model to the Hugging Face model hub after saving it.
 
-                <Tip warning=***REMOVED***true***REMOVED***>
+                <Tip warning={true}>
 
                 Using `push_to_hub=True` will synchronize the repository you are pushing to with `save_directory`,
                 which requires `save_directory` to be a local clone of the repo you are pushing to if it's an existing
@@ -955,7 +955,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 The maximum size for a checkpoint before being sharded. Checkpoints shard will then be each of size
                 lower than this size. If expressed as a string, needs to be digits followed by a unit (like `"5MB"`).
 
-                <Tip warning=***REMOVED***true***REMOVED***>
+                <Tip warning={true}>
 
                 If a single weight of the model is bigger than `max_shard_size`, it will be in its own checkpoint shard
                 which will be bigger than `max_shard_size`.
@@ -966,7 +966,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 Additional key word arguments passed along to the [`~utils.PushToHubMixin.push_to_hub`] method.
         """
         if os.path.isfile(save_directory):
-            logger.error(f"Provided path (***REMOVED***save_directory***REMOVED***) should be a directory, not a file")
+            logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
             return
 
         if push_to_hub:
@@ -1014,9 +1014,9 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                 content = json.dumps(index, indent=2, sort_keys=True) + "\n"
                 f.write(content)
             logger.info(
-                f"The model is bigger than the maximum size per checkpoint (***REMOVED***max_shard_size***REMOVED***) and is going to be "
-                f"split in ***REMOVED***len(shards)***REMOVED*** checkpoint shards. You can find where each parameters has been saved in the "
-                f"index located at ***REMOVED***save_index_file***REMOVED***."
+                f"The model is bigger than the maximum size per checkpoint ({max_shard_size}) and is going to be "
+                f"split in {len(shards)} checkpoint shards. You can find where each parameters has been saved in the "
+                f"index located at {save_index_file}."
             )
             for shard_file, shard in shards.items():
                 # the shard item are unflattened, to save them we need to flatten them again
@@ -1025,11 +1025,11 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
                     shard_bytes = to_bytes(params)
                     f.write(shard_bytes)
 
-        logger.info(f"Model weights saved in ***REMOVED***output_model_file***REMOVED***")
+        logger.info(f"Model weights saved in {output_model_file}")
 
         if push_to_hub:
             url = self._push_to_hub(repo, commit_message=commit_message)
-            logger.info(f"Model pushed to the hub in this commit: ***REMOVED***url***REMOVED***")
+            logger.info(f"Model pushed to the hub in this commit: {url}")
 
     @classmethod
     def register_for_auto_class(cls, auto_class="FlaxAutoModel"):
@@ -1037,7 +1037,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         Register this class with a given auto class. This should only be used for custom models as the ones in the
         library are already mapped with an auto class.
 
-        <Tip warning=***REMOVED***true***REMOVED***>
+        <Tip warning={true}>
 
         This API is experimental and may have some slight breaking changes in the next releases.
 
@@ -1053,7 +1053,7 @@ class FlaxPreTrainedModel(PushToHubMixin, FlaxGenerationMixin):
         import transformers.models.auto as auto_module
 
         if not hasattr(auto_module, auto_class):
-            raise ValueError(f"***REMOVED***auto_class***REMOVED*** is not a valid auto class.")
+            raise ValueError(f"{auto_class} is not a valid auto class.")
 
         cls._auto_class = auto_class
 

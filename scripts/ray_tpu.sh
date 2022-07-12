@@ -52,5 +52,5 @@ fi
 
 sudo pkill python* | true
 # TODO: this should be it's own command.
-TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1 --resources="***REMOVED***\"tpu\": 1***REMOVED***"
+TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1 --resources="{\"tpu\": 1}"
 # TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1

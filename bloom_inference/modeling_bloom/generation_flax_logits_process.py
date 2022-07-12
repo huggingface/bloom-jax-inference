@@ -54,7 +54,7 @@ class FlaxLogitsProcessor:
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray) -> jnp.ndarray:
         """Flax method for processing logits."""
         raise NotImplementedError(
-            f"***REMOVED***self.__class__***REMOVED*** is an abstract class. Only classes inheriting this class can be called."
+            f"{self.__class__} is an abstract class. Only classes inheriting this class can be called."
         )
 
 
@@ -65,7 +65,7 @@ class FlaxLogitsWarper:
     def __call__(self, input_ids: jnp.ndarray, scores: jnp.ndarray) -> jnp.ndarray:
         """Flax method for warping logits."""
         raise NotImplementedError(
-            f"***REMOVED***self.__class__***REMOVED*** is an abstract class. Only classes inheriting this class can be called."
+            f"{self.__class__} is an abstract class. Only classes inheriting this class can be called."
         )
 
 
@@ -83,8 +83,8 @@ class FlaxLogitsProcessorList(list):
             if len(function_args) > 3:
                 if not all(arg in kwargs for arg in list(function_args.keys())[2:]):
                     raise ValueError(
-                        f"Make sure that all the required parameters: ***REMOVED***list(function_args.keys())***REMOVED*** for "
-                        f"***REMOVED***processor.__class__***REMOVED*** are passed to the logits processor."
+                        f"Make sure that all the required parameters: {list(function_args.keys())} for "
+                        f"{processor.__class__} are passed to the logits processor."
                     )
                 scores = processor(input_ids, scores, cur_len, **kwargs)
             else:
@@ -103,7 +103,7 @@ class FlaxTemperatureLogitsWarper(FlaxLogitsWarper):
 
     def __init__(self, temperature: float):
         if not isinstance(temperature, float) or not (temperature > 0):
-            raise ValueError(f"`temperature` has to be a strictly positive float, but is ***REMOVED***temperature***REMOVED***")
+            raise ValueError(f"`temperature` has to be a strictly positive float, but is {temperature}")
 
         self.temperature = temperature
 
@@ -128,7 +128,7 @@ class FlaxTopPLogitsWarper(FlaxLogitsWarper):
 
     def __init__(self, top_p: float, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
         if not isinstance(top_p, float) or (top_p < 0 or top_p > 1.0):
-            raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is ***REMOVED***top_p***REMOVED***")
+            raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
 
         self.top_p = top_p
         self.filter_value = filter_value
@@ -169,7 +169,7 @@ class FlaxTopKLogitsWarper(FlaxLogitsWarper):
 
     def __init__(self, top_k: int, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
         if not isinstance(top_k, int) or top_k <= 0:
-            raise ValueError(f"`top_k` has to be a strictly positive integer, but is ***REMOVED***top_k***REMOVED***")
+            raise ValueError(f"`top_k` has to be a strictly positive integer, but is {top_k}")
 
         self.top_k = top_k
         self.filter_value = filter_value
@@ -250,10 +250,10 @@ class FlaxMinLengthLogitsProcessor(FlaxLogitsProcessor):
 
     def __init__(self, min_length: int, eos_token_id: int):
         if not isinstance(min_length, int) or min_length < 0:
-            raise ValueError(f"`min_length` has to be a positive integer, but is ***REMOVED***min_length***REMOVED***")
+            raise ValueError(f"`min_length` has to be a positive integer, but is {min_length}")
 
         if not isinstance(eos_token_id, int) or eos_token_id < 0:
-            raise ValueError(f"`eos_token_id` has to be a positive integer, but is ***REMOVED***eos_token_id***REMOVED***")
+            raise ValueError(f"`eos_token_id` has to be a positive integer, but is {eos_token_id}")
 
         self.min_length = min_length
         self.eos_token_id = eos_token_id

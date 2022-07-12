@@ -59,7 +59,7 @@ class TPUManager:
         for node in self.nodes:
             node.run.remote()
 
-        print(f"TPU workers created in ***REMOVED***time.time() - start:.06***REMOVED***s")
+        print(f"TPU workers created in {time.time() - start:.06}s")
 
 
     # @func_set_timeout(600)

@@ -4,7 +4,7 @@ import time
 from queue import Queue
 
 
-@ray.remote(resources=***REMOVED***"tpu": 1***REMOVED***)
+@ray.remote(resources={"tpu": 1})
 # @ray.remote
 class TPUHostWorker(object):
     def __init__(
@@ -41,8 +41,8 @@ class TPUHostWorker(object):
             head_print("TPU not found. Returning")
             ray.shutdown()
             return
-        head_print(f"jax devices: ***REMOVED***device_count***REMOVED***")
-        head_print(f"jax runtime initialized in ***REMOVED***time.time() - start:.06***REMOVED***s")
+        head_print(f"jax devices: {device_count}")
+        head_print(f"jax runtime initialized in {time.time() - start:.06}s")
 
         # load model and params
         head_print("Loading model")

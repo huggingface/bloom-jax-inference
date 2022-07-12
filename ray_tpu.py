@@ -20,12 +20,12 @@ def get_project():
 
 
 def check_tpu(name, zone):
-    headers = ***REMOVED***
-        "Authorization": f"Bearer ***REMOVED***get_bearer()***REMOVED***",
-    ***REMOVED***
+    headers = {
+        "Authorization": f"Bearer {get_bearer()}",
+    }
 
     response = requests.get(
-        f"https://tpu.googleapis.com/v2alpha1/projects/***REMOVED***get_project()***REMOVED***/locations/***REMOVED***zone***REMOVED***/nodes/***REMOVED***name***REMOVED***",
+        f"https://tpu.googleapis.com/v2alpha1/projects/{get_project()}/locations/{zone}/nodes/{name}",
         headers=headers)
 
     return response.json()
@@ -39,8 +39,8 @@ def get_connection(
     outputs = []
     for i in info["networkEndpoints"]:
         outputs.append(Connection(i["ipAddress"],
-                                  connect_kwargs=***REMOVED***
-                                      "key_filename": os.path.expanduser("~/.ssh/google_compute_engine"), ***REMOVED***))
+                                  connect_kwargs={
+                                      "key_filename": os.path.expanduser("~/.ssh/google_compute_engine"), }))
     return outputs
 
 
@@ -58,6 +58,10 @@ def start_ray(conn, address):
     for i in glob.glob("bloom_inference/*.py"):
         conn.put(i, "bloom-jax-inference/bloom_inference/")
 
+    # copy CPU/TPU manager files into bloom_inference/bloom_inference
+    for i in glob.glob("scripts/*.sh"):
+        conn.put(i, "bloom_inference/scripts/")
+
     # copy modeling files into bloom_inference/bloom_inference/modeling_bloom
     for i in glob.glob("bloom_inference/modeling_bloom/*.py"):
         conn.put(i, "bloom-jax-inference/bloom_inference/modeling_bloom/")
@@ -70,17 +74,16 @@ def start_ray(conn, address):
     conn.put("key.json", "bloom-jax-inference/")
 
     # transfer start-up script from CPU -> hosts and give permissions
-    conn.put("scripts/ray_tpu.sh", "/tmp/ray-tpu.sh")
-    conn.sudo("chmod +x /tmp/ray-tpu.sh", hide=True)
+    conn.sudo("chmod +x bloom_inference/scripts/ray_tpu.sh", hide=True)
 
     try:
         conn.run("ray stop -f", hide=True)
     except:
         pass
-    
+
     time.sleep(1)
-    
+
     # run start-up script
-    out = conn.run(f"bash /tmp/ray-tpu.sh ***REMOVED***address***REMOVED***", hide=False)
+    out = conn.run(f"bash /tmp/ray-tpu.sh {address}", hide=False)
     # display result
     print(out)
