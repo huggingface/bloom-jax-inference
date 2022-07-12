@@ -28,7 +28,7 @@ max_len = args.max_len
 input_len = args.input_len
 
 config = BloomConfig.from_pretrained(ckpt)
-model, params = FlaxBloomForCausalLM.from_pretrained(ckpt, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+model, params = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
 
 
@@ -63,8 +63,12 @@ def init_state():
 
 state_shapes = jax.eval_shape(init_state)
 
-num_mp_partitions = 4
-partitioner = PjitPartitioner(num_mp_partitions, logical_axis_rules=logical_axis_rules_full)
+# model_parallel_submesh = (2, 2, 2, 1), (2, 4, 1, 1), (2, 1, 4, 1) (1, 4, 2, 1) (1, 2, 4, 1)
+model_parallel_submesh = (1, 2, 4, 1)
+partitioner = PjitPartitioner(
+    model_parallel_submesh=model_parallel_submesh,
+    logical_axis_rules=logical_axis_rules_full
+)
 mesh_axes = partitioner.get_mesh_axes(state_shapes)
 params_spec = mesh_axes.params
 
