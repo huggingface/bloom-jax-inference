@@ -1,6 +1,6 @@
 INSTANCE=bloom-tpu-v4-64
 ZONE=us-central2-b
-PROJECT=my_project
+PROJECT="huggingface-ml"
 
 echo copying $1 to $2
 
