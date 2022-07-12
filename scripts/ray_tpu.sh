@@ -7,6 +7,7 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 # debugging
 #rm -rf ~/venv
 #rm -rf ~/t5x
+#rm -rf ~/transformers
 #rm -rf ~/.cache/pip
 
 # check if venv exists
@@ -29,7 +30,13 @@ else
   source ~/venv/bin/activate
 
   # pip install standard packages
-  pip install ray==1.13.0 transformers fabric dataclasses tqdm func_timeout
+  pip install ray==1.13.0 fabric dataclasses tqdm func_timeout
+  # build transformers from source
+  git clone https://github.com/huggingface/transformers.git
+  cd transformers
+  pip install -e ."[flax]"
+  cd ..
+  pip install flatbuffers=1.12
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
   cd t5x
