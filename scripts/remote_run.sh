@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# INSTANCE=bloom-tpu-v4-64
-# ZONE=us-central2-b
+INSTANCE=bloom-tpu-v4-64
+ZONE=us-central2-b
 
-INSTANCE=$1
-COMMAND=$2
+# INSTANCE=$1
+COMMAND=$1
 PROJECT=huggingface-ml
 ZONE=us-central2-b
 
