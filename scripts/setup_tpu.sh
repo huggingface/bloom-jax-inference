@@ -12,6 +12,7 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 if [ -d ~/bloom-jax-inference ];
 then
   pushd ~/bloom-jax-inference
+  git checkout tpu-v4-64 | true
   git pull | true
   popd
 else
@@ -42,7 +43,7 @@ else
 
   # pip install standard packages
   pip install -U pip
-  pip install ray==1.13.0 transformers fabric dataclasses tqdm func_timeout
+  pip install ray==1.13.0 git+https://github.com/huggingface/transformers.git fabric dataclasses tqdm func_timeout
   
   # build T5X from source
   git clone --branch=main https://github.com/google-research/t5x
