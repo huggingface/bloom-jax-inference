@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
-export GOOGLE_APPLICATION_CREDENTIALS=~/bloom-jax-inference/key.json
-
 # this locks the python executable down to hopefully stop if from being fiddled with...
 screen -d -m python -c "import time; time.sleep(999999999)"
 
@@ -20,6 +17,9 @@ then
 else
     git clone -b v3-pod https://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@github.com/huggingface/bloom-jax-inference
 fi
+
+gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
+export GOOGLE_APPLICATION_CREDENTIALS=~/bloom-jax-inference/key.json
 
 # check if venv exists
 if [ -f ~/venv/bin/activate ];
