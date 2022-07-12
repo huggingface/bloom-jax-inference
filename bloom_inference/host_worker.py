@@ -1,13 +1,15 @@
+import os
 import ray
 import time
 from queue import Queue
 
 
 @ray.remote(resources={"tpu": 1})
+# @ray.remote
 class TPUHostWorker(object):
     def __init__(
         self,
-        ckpt="bigscience/bloom-6b3",
+        ckpt="bigscience/bloom",
         t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
         max_len=256,
         max_input_len=64,
@@ -22,6 +24,11 @@ class TPUHostWorker(object):
         self.input_q = Queue(maxsize=1)
         self.output_q = Queue(maxsize=1)
 
+        self._is_cpu = os.path.exists("/home/suraj_huggingface_co/bloom-jax-inference/is_cpu.txt")
+    
+    def is_cpu(self):
+        return self._is_cpu
+
     def run(self):
         # we import packages here to import JAX and Generator only on the Host worker and not the CPU manager
         import jax
@@ -29,7 +36,12 @@ class TPUHostWorker(object):
 
         print(f"jax runtime initialization starting")
         start = time.time()
-        head_print(f"jax devices: {jax.device_count()}")
+        device_count = jax.device_count()
+        if device_count == 1:
+            head_print("TPU not found. Returning")
+            ray.shutdown()
+            return
+        head_print(f"jax devices: {device_count}")
         head_print(f"jax runtime initialized in {time.time() - start:.06}s")
 
         # load model and params

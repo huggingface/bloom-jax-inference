@@ -1,5 +1,5 @@
 import argparse
-from time import time
+import time
 
 import numpy as np
 import jax
@@ -28,7 +28,7 @@ max_len = args.max_len
 input_len = args.input_len
 
 config = BloomConfig.from_pretrained(ckpt)
-model, params = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
 
 
@@ -102,7 +102,7 @@ inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncati
 # This will auto-magically run in mesh context
 start = time.time()
 gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(gen_ids.local_shards[0].data, skip_special_tokens=False)
+generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)
 if jax.process_index() == 0:
     print("Compilation time:", time.time() - start)
 

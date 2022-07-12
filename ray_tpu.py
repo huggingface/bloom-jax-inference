@@ -46,21 +46,28 @@ def get_connection(
 
 def start_ray(conn, address):
     # start afresh each launch (temporarily)
-    conn.run("sudo rm -rf *.py bloom_inference")
+    conn.run("sudo rm -rf *.py bloom-jax-inference")
     # make directory of structure: bloom_inference/bloom_inference/modeling_bloom
-    conn.run("mkdir bloom_inference bloom_inference/bloom_inference bloom_inference/bloom_inference/modeling_bloom -p")
-    
+    conn.run("mkdir bloom-jax-inference bloom-jax-inference/bloom_inference bloom-jax-inference/bloom_inference/modeling_bloom -p")
+
     # copy run files into bloom_inference
     for i in glob.glob("*.py"):
-        conn.put(i, "bloom_inference/")
+        conn.put(i, "bloom-jax-inference/")
 
     # copy CPU/TPU manager files into bloom_inference/bloom_inference
     for i in glob.glob("bloom_inference/*.py"):
-        conn.put(i, "bloom_inference/bloom_inference/")
+        conn.put(i, "bloom-jax-inference/bloom_inference/")
 
     # copy modeling files into bloom_inference/bloom_inference/modeling_bloom
     for i in glob.glob("bloom_inference/modeling_bloom/*.py"):
-        conn.put(i, "bloom_inference/bloom_inference/modeling_bloom/")
+        conn.put(i, "bloom-jax-inference/bloom_inference/modeling_bloom/")
+
+    # copy modeling files into bloom_inference/bloom_inference/modeling_bloom
+    for i in glob.glob("*.sh"):
+        conn.put(i, "bloom-jax-inference/")
+
+    # copy key files into bloom_inference
+    conn.put("key.json", "bloom-jax-inference/")
 
     # transfer start-up script from CPU -> hosts and give permissions
     conn.put("scripts/ray_tpu.sh", "/tmp/ray-tpu.sh")
@@ -74,6 +81,6 @@ def start_ray(conn, address):
     time.sleep(1)
     
     # run start-up script
-    out = conn.run(f"bash /tmp/ray-tpu.sh {address}", hide=True)
+    out = conn.run(f"bash /tmp/ray-tpu.sh {address}", hide=False)
     # display result
     print(out)

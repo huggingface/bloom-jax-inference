@@ -50,7 +50,7 @@ class Generator:
     def __init__(
         self,
         model_parallel_submesh=(1, 2, 4, 1), # for v4-64
-        ckpt="bigscience/bloom-6b3",
+        ckpt="bigscience/bloom",
         t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
         max_len=256,
         max_input_len=64,
@@ -62,14 +62,14 @@ class Generator:
         self.max_input_len = max_input_len
 
         config = BloomConfig.from_pretrained(ckpt, max_length=max_len, do_sample=True, num_beams=1, top_p=0.9)
-        model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+        self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 
         def init_state():
             input_shape = (1,1)
             input_ids = jnp.zeros(input_shape, dtype="i4")
             attention_mask = jnp.ones_like(input_ids)
             rng = jax.random.PRNGKey(0)
-            initial_vars = model.module.init(rng, input_ids, attention_mask, return_dict=False)
+            initial_vars = self.model.module.init(rng, input_ids, attention_mask, return_dict=False)
             return InferenceState.create(initial_vars)
         
         state_shapes = jax.eval_shape(init_state)
