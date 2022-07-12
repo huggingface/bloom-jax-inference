@@ -4,9 +4,7 @@ import numpy as np
 
 class TPUManager:
     # @func_set_timeout(1200)
-    def __init__(self,
-                 num_mp_partitions,
-                 node_count):
+    def __init__(self, num_mp_partitions, node_count):
         # needs a valid ray cluster to start
         assert ray.is_initialized(), "ray not initialised"
 
