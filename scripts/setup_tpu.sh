@@ -9,13 +9,13 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 #rm -rf ~/t5x
 #rm -rf ~/.cache/pip
 
-if [ -d ~/bloom-jax-inference];
+if [[ -d ~/bloom-jax-inference]];
 then
     pushd ~/bloom-jax-inference
     git pull
     popd
 else
-    git clone -b v3-pod https://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@github.com/huggingface/bloom-jax-inference
+    git clone -b tpu-v4-64 https://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@github.com/huggingface/bloom-jax-inference
 fi
 
 gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
