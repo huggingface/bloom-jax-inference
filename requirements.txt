@@ -5,3 +5,4 @@ dataclasses
 func_timeout
 numpy
 requests
+numpy

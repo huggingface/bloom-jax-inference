@@ -140,11 +140,11 @@ class FlaxGenerationMixin:
         return state
 
     def _prepare_encoder_decoder_kwargs_for_generation(self, input_ids, params, model_kwargs):
-        encoder_kwargs = ***REMOVED***
+        encoder_kwargs = {
             argument: value
             for argument, value in model_kwargs.items()
             if not (argument.startswith("decoder_") or argument.startswith("cross_attn"))
-        ***REMOVED***
+        }
         model_kwargs["encoder_outputs"] = self.encode(input_ids, params=params, return_dict=True, **encoder_kwargs)
         return model_kwargs
 
@@ -194,7 +194,7 @@ class FlaxGenerationMixin:
             - *beam-search decoding* by calling [`~generation_utils.FlaxGenerationMixin._beam_search`] if `num_beams>1`
               and `do_sample=False`.
 
-        <Tip warning=***REMOVED***true***REMOVED***>
+        <Tip warning={true}>
 
         Apart from `inputs`, all the arguments below will default to the value of the attribute of the same name as
         defined in the model's config (`config.json`) which in turn defaults to the
@@ -272,8 +272,8 @@ class FlaxGenerationMixin:
             raise ValueError("`decoder_start_token_id` has to be defined for encoder-decoder generation.")
         if min_length is not None and min_length > max_length:
             raise ValueError(
-                f"Unfeasable length constraints: the minimum length (***REMOVED***min_length***REMOVED***) is larger than the maximum "
-                f"length (***REMOVED***max_length***REMOVED***)"
+                f"Unfeasable length constraints: the minimum length ({min_length}) is larger than the maximum "
+                f"length ({max_length})"
             )
 
         if self.config.is_encoder_decoder:
