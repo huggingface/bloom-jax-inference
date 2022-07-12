@@ -7,7 +7,7 @@ from jax.experimental import PartitionSpec as P
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 
-from bloom_inference import FlaxBloomForCausalLM, BloomConfig
+from bloom_inference.modeling_bloom import FlaxBloomForCausalLM, BloomConfig
 from transformers import AutoTokenizer
 
 ckpt = "sanchit-gandhi/bloom-350m-scan-t5x"
