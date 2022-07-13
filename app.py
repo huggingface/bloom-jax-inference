@@ -88,7 +88,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
         BOX_COMP: "#120F25",
     }
 
-    new_string = data[0]['generated_text']
+    new_string = data[0]['generated_text'].split(input_sentence, 1)[1]
 
     _, img = main(
         input_sentence,
