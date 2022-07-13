@@ -7,11 +7,12 @@ class TPUManager:
     def __init__(
         self,
         node_count=8,
-        ckpt="bigscience/bloom-6b3",
-        t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
+        ckpt="bigscience/bloom",
+        t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0",
         max_len=256,
         max_input_len=64,
-        model_parallel_submesh=(1, 2, 4, 1), # for v4-64
+        model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
+
     ):
         # needs a valid ray cluster to start
         assert ray.is_initialized(), "ray not initialised"
@@ -46,12 +47,12 @@ class TPUManager:
 
 
     # @func_set_timeout(600)
-    def generate(self, context):
-        # TODO: split context (prompts) if len(context) != 4
-        #context = np.array_split(context, len(self.nodes), axis=0)
+    def generate(self, inputs, do_sample=True):
         res = []
 
-        for n, ctx in zip(self.nodes, context):
-            res.append(n.generate.remote(ctx))
+        for n in self.nodes:
+            res.append(n.generate.remote(inputs, do_sample))
 
-        return [i for i in ray.get(res)]
+        res = ray.get(res)
+
+        return [i for i in res]

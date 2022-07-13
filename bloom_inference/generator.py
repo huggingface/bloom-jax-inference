@@ -30,7 +30,7 @@ def head_print(*args, **kwargs):
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
-    ('batch', 'data'),
+    ('batch', None),
     ('mlp', 'model'),
     ('heads', 'model'),
     ('vocab', 'model'),
@@ -51,9 +51,9 @@ logical_axis_rules_full = [
 class Generator:
     def __init__(
             self,
-            model_parallel_submesh=(1, 2, 4, 1),  # for v4-64
-            ckpt="bigscience/bloom-6b3",
-            t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
+            model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
+            ckpt="bigscience/bloom",
+            t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0",
             max_len=256,
             max_input_len=64,
     ):
@@ -63,15 +63,15 @@ class Generator:
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
 
-        config = BloomConfig.from_pretrained(ckpt, max_length=max_len, do_sample=True, num_beams=1, top_p=0.9)
-        model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+        config = BloomConfig.from_pretrained(self.ckpt)
+        self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 
         def init_state():
             input_shape = (1, 1)
             input_ids = jnp.zeros(input_shape, dtype="i4")
             attention_mask = jnp.ones_like(input_ids)
             rng = jax.random.PRNGKey(0)
-            initial_vars = model.module.init(rng, input_ids, attention_mask, return_dict=False)
+            initial_vars = self.model.module.init(rng, input_ids, attention_mask, return_dict=False)
             return InferenceState.create(initial_vars)
 
         state_shapes = jax.eval_shape(init_state)
@@ -97,21 +97,37 @@ class Generator:
         self.tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
         self.tokenizer.padding_side = "left"
 
-        def generate(params, input_ids, attention_mask):
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
+        def greedy_generate(params, input_ids, attention_mask):
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=False, num_beams=1, max_length=self.max_len).sequences
             return output_ids
 
-        self.p_generate = self.partitioner.partition(
-            generate,
-            in_axis_resources=(self.params_spec, P("data"), P("data")),
-            out_axis_resources=P("data")
+        def sample_generate(params, input_ids, attention_mask):
+            # TODO: top_k sampling, set to 0?
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9, max_length=self.max_len).sequences
+            return output_ids
+
+        self.p_greedy_generate = self.partitioner.partition(
+            greedy_generate,
+            in_axis_resources=(self.params_spec, None, None),
+            out_axis_resources=None,
         )
 
-    def generate(self, prompts):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True,
-                                max_length=self.max_input_len)
+        self.p_sample_generate = self.partitioner.partition(
+            sample_generate,
+            in_axis_resources=(self.params_spec, None, None),
+            out_axis_resources=None,
+        )
+
+    def generate(self, prompts, do_sample):
+        if do_sample:
+            return self.gen(prompts, self.p_sample_generate)
+        else:
+            return self.gen(prompts, self.p_greedy_generate)
+
+    def gen(self, prompts, gen_fn):
+        inputs = self.tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=self.max_input_len, pad_to_multiple_of=self.max_input_len)
         # This will auto-magically run in mesh context
-        gen_ids = self.p_generate(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+        gen_ids = gen_fn(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
 
         generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
         return generated_text
