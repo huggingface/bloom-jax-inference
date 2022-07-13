@@ -8,10 +8,10 @@ class TPUHostWorker(object):
     def __init__(
         self,
         ckpt="bigscience/bloom-6b3",
-        t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0",
+        t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0",
         max_len=256,
         max_input_len=64,
-        model_parallel_submesh=(1, 2, 4, 1), # for v4-64
+        model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
     ):
         self.ckpt = ckpt
         self.path = t5x_path
@@ -27,7 +27,7 @@ class TPUHostWorker(object):
         import jax
         from bloom_inference.generator import Generator, head_print
 
-        print(f"jax runtime initialization starting")
+        head_print(f"jax runtime initialization starting")
         start = time.time()
         head_print(f"jax devices: {jax.device_count()}")
         head_print(f"jax runtime initialized in {time.time() - start:.06}s")
@@ -45,13 +45,13 @@ class TPUHostWorker(object):
         head_print("Loading complete")
 
         while True:
-            operation, prompts = self.input_q.get()
+            operation, prompts, do_sample = self.input_q.get()
             if operation == "generate":
-                generated_text = generator.generate(prompts)
+                generated_text = generator.generate(prompts, do_sample)
                 self.output_q.put(generated_text)
             else:
                 raise Exception("Not implemented")
 
-    def generate(self, input):
-        self.input_q.put(("generate", input))
+    def generate(self, inputs, do_sample):
+        self.input_q.put(("generate", inputs, do_sample))
         return self.output_q.get()
