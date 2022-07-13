@@ -28,25 +28,25 @@ API_URL = os.getenv("API_URL")
 examples = [
     [
         'A "whatpu" is a small, furry animal native to Tanzania. An example of a sentence that uses the word whatpu is: We were traveling in Africa and we saw these very cute whatpus. To do a "farduddle" means to jump up and down really fast. An example of a sentence that uses the word farduddle is:',
-        64, "sampling", False],
+        64, "sampling", True],
     ['A poem about the beauty of science by Alfred Edgar Brittle\nTitle: The Magic Craft\nIn the old times', 64,
-     "sampling", False],
-    ['استخراج العدد العاملي في لغة بايثون:', 64, "sampling", False],
-    ["Pour déguster un ortolan, il faut tout d'abord", 64, "sampling", False],
+     "sampling", True],
+    ['استخراج العدد العاملي في لغة بايثون:', 64, "sampling", True],
+    ["Pour déguster un ortolan, il faut tout d'abord", 64, "sampling", True],
     [
         'Traduce español de España a español de Argentina\nEl coche es rojo - el auto es rojo\nEl ordenador es nuevo - la computadora es nueva\nel boligrafo es negro -',
-        64, "sampling", False],
+        64, "sampling", True],
     [
         'Estos ejemplos quitan vocales de las palabras\nEjemplos:\nhola - hl\nmanzana - mnzn\npapas - pps\nalacran - lcrn\npapa -',
-        64, "sampling", False],
-    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "sampling", False],
-    ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", False],
+        64, "sampling", True],
+    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "sampling", True],
+    ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", True],
     [
         "Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother?\nAnswer:",
-        64, "sampling", False],
+        64, "sampling", True],
     [
         "spelling test answers.\nWhat are the letters in « language »?\nAnswer: l-a-n-g-u-a-g-e\nWhat are the letters in « Romanian »?\nAnswer:",
-        64, "sampling", False]
+        64, "sampling", True]
 ]
 
 
@@ -59,7 +59,7 @@ def query(payload):
 
 def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
     payload = {
-        "prompt": input_sentence,
+        "inputs": input_sentence,
         "do_sample": True,
         # "max_new_tokens": max_length
     }
@@ -68,8 +68,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
         payload
     )
 
-    # if raw_text:
-    if True:
+    if raw_text:
         return None, data[0]['generated_text']
 
     width, height = 3326, 3326
@@ -88,7 +87,8 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
         BOX_COMP: "#120F25",
     }
 
-    new_string = data[0]['generated_text'].split(input_sentence, 1)[1]
+    # TODO: fix screenshot
+    new_string = data[0]['generated_text'][0].split(input_sentence, 1)[1]
 
     _, img = main(
         input_sentence,
