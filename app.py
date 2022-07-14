@@ -1,7 +1,5 @@
 import gradio as gr
-import re
 import requests
-import json
 import os
 from screenshot import BG_COMP, BOX_COMP, GENERATION_VAR, PROMPT_VAR, main
 from pathlib import Path
@@ -13,6 +11,7 @@ Tips:
 - Do NOT talk to BLOOM as an entity, it's not a chatbot but a webpage/blog/article completion model.
 - For the best results: MIMIC a few sentences of a webpage similar to the content you want to generate.
 Start a paragraph as if YOU were writing a blog, webpage, math post, coding article and BLOOM will generate a coherent follow-up. Longer prompts usually give more interesting results.
+
 Options:
 - sampling: imaginative completions (may be not super accurate e.g. math/history)
 - greedy: accurate completions (may be more boring or have repetitions)
@@ -27,6 +26,7 @@ Tips:
 - Do NOT talk to BLOOM as an entity, it's not a chatbot but a webpage/blog/article completion model.
 - For the best results: MIMIC a few sentences of a webpage similar to the content you want to generate.
 Start a paragraph as if YOU were writing a blog, webpage, math post, coding article and BLOOM will generate a coherent follow-up. Longer prompts usually give more interesting results.
+
 Options:
 - sampling: imaginative completions (may be not super accurate e.g. math/history)
 - greedy: accurate completions (may be more boring or have repetitions)
@@ -35,27 +35,26 @@ Options:
 API_URL = os.getenv("API_URL")
 
 examples = [
-    [
-        'A "whatpu" is a small, furry animal native to Tanzania. An example of a sentence that uses the word whatpu is: We were traveling in Africa and we saw these very cute whatpus. To do a "farduddle" means to jump up and down really fast. An example of a sentence that uses the word farduddle is:',
+
+    ['To do a "farduddle" means to jump up and down really fast. An example of a sentence that uses the word farduddle is:',
         64, "sampling", True],
     ['A poem about the beauty of science by Alfred Edgar Brittle\nTitle: The Magic Craft\nIn the old times', 64,
      "sampling", True],
-    ['استخراج العدد العاملي في لغة بايثون:', 64, "sampling", True],
+    ['استخراج العدد العاملي في لغة بايثون:', 64, "greedy", True],
     ["Pour déguster un ortolan, il faut tout d'abord", 64, "sampling", True],
-    [
-        'Traduce español de España a español de Argentina\nEl coche es rojo - el auto es rojo\nEl ordenador es nuevo - la computadora es nueva\nel boligrafo es negro -',
+    ['Traduce español de España a español de Argentina\nEl coche es rojo - el auto es rojo\nEl ordenador es nuevo - la computadora es nueva\nel boligrafo es negro -',
         64, "sampling", True],
-    [
-        'Estos ejemplos quitan vocales de las palabras\nEjemplos:\nhola - hl\nmanzana - mnzn\npapas - pps\nalacran - lcrn\npapa -',
+    ['Estos ejemplos quitan vocales de las palabras\nEjemplos:\nhola - hl\nmanzana - mnzn\npapas - pps\nalacran - lcrn\npapa -',
         64, "sampling", True],
-    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "sampling", True],
+    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "greedy", True],
     ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", True],
-    [
-        "Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother?\nAnswer:",
+    ["Python code to compute the factorial of a given number:", 64, "greedy", True],
+    ["Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother?\nAnswer:",
         64, "sampling", True],
-    [
-        "spelling test answers.\nWhat are the letters in « language »?\nAnswer: l-a-n-g-u-a-g-e\nWhat are the letters in « Romanian »?\nAnswer:",
-        64, "sampling", True]
+    ["spelling test answers.\nWhat are the letters in « language »?\nAnswer: l-a-n-g-u-a-g-e\nWhat are the letters in « Romanian »?\nAnswer:",
+        64, "sampling", True],
+    ['A "whatpu" is a small, furry animal native to Tanzania. An example of a sentence that uses the word whatpu is:',
+     64, "sampling", True],
 ]
 
 
@@ -67,9 +66,10 @@ def query(payload):
 
 
 def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
+    do_sample = sample_or_greedy == "sampling"
     payload = {
         "inputs": input_sentence,
-        "do_sample": True,
+        "do_sample": do_sample,
         # "max_new_tokens": max_length
     }
 
@@ -120,7 +120,7 @@ gr.Interface(
     [
         gr.inputs.Textbox(label="Input"),
         gr.inputs.Radio([64], default=64, label="Tokens to generate"),
-        gr.inputs.Radio(["sampling"], label="Sample or greedy", default="sampling"),
+        gr.inputs.Radio(["sampling", "greedy"], label="Sample or greedy", default="sampling"),
         gr.Checkbox(label="Just output raw text", value=True),
     ],
     ["image", "text"],
