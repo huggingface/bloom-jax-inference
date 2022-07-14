@@ -48,7 +48,7 @@ examples = [
         64, "sampling", True],
     ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "greedy", True],
     ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", True],
-    ["Python code to compute the factorial of a given number:", 64, "greedy", True],
+    ["Python - code to compute the factorial of a number:", 64, "greedy", True],
     ["Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother?\nAnswer:",
         64, "sampling", True],
     ["spelling test answers.\nWhat are the letters in « language »?\nAnswer: l-a-n-g-u-a-g-e\nWhat are the letters in « Romanian »?\nAnswer:",
