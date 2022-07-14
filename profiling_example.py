@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-from jax.experimental import PartitionSpec as P
 
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
@@ -10,8 +9,8 @@ from transformers import AutoTokenizer
 
 from bloom_inference.modeling_bloom import FlaxBloomForCausalLM, BloomConfig
 
-ckpt = "bigscience/bloom-350m"
-t5x_path = "gs://suraj-bloom-tpu-bucket/bloom-350m-scan-t5x/checkpoint_0"
+#ckpt = "bigscience/bloom-350m"
+#t5x_path = "gs://suraj-bloom-tpu-bucket/bloom-350m-scan-t5x/checkpoint_0"
 
 ckpt = "bigscience/bloom-6b3"
 t5x_path = "gs://suraj-tpu-bucket/bloom-6b3-scan-t5x-v3-8-pretrained/checkpoint_0"
@@ -98,7 +97,7 @@ inputs = tokenizer(prompts, return_tensors="jax", padding=True, truncation=True,
 gen_ids = p_sample_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
 
 
-with jax.profiler.trace(log_dir="/home/sanchitgandhi/tensorboard"):
+with jax.profiler.trace(log_dir="/tmp/tensorboard"):
     # generation
     gen_ids = p_sample_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
     gen_ids.block_until_ready()
