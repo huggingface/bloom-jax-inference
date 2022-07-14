@@ -6,7 +6,7 @@ import os
 from screenshot import BG_COMP, BOX_COMP, GENERATION_VAR, PROMPT_VAR, main
 from pathlib import Path
 
-title = "BLOOM"
+title = "JAX / Flax BLOOM 🌸"
 
 description = """Gradio Demo for BLOOM. To use it, simply add your text, or click one of the examples to load them.
 Tips:
@@ -20,7 +20,10 @@ Options:
 
 wip_description = """JAX / Flax Gradio Demo for BLOOM. The 176B BLOOM model running on a TPU v3-256 pod, with 2D model parallelism and custom mesh axes.
 
-Note: for this WIP demo only **sampling** is supported.
+
+Note:
+1. For this WIP demo, only **sampling** is supported.
+2. Rendering of the screenshot is currently not optimised. To experience the true speed of JAX / Flax, tick 'just output raw text'.
 """
 
 API_URL = os.getenv("API_URL")
@@ -69,7 +72,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
     )
 
     if raw_text:
-        return None, data[0]['generated_text']
+        return None, data[0]['generated_text'][0]
 
     width, height = 3326, 3326
     assets_path = "assets"
@@ -100,10 +103,10 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
         colors=colors,
         frame_to_box_margin=200,
         text_to_text_box_margin=50,
-        init_font_size=150,
+        init_font_size=142,
         right_align=False,
     )
-    return img, data[0]['generated_text']
+    return img, data[0]['generated_text'][0]
 
 
 gr.Interface(
