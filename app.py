@@ -18,12 +18,18 @@ Options:
 - greedy: accurate completions (may be more boring or have repetitions)
 """
 
-wip_description = """JAX / Flax Gradio Demo for BLOOM. The 176B BLOOM model running on a TPU v3-256 pod, with 2D model parallelism and custom mesh axes.
+wip_description = """Gradio Demo for JAX / Flax BLOOM. The 176B BLOOM model running on a TPU v3-256 pod, with 2D model parallelism and custom mesh axes.
 
 
-Note:
-1. For this WIP demo, only **sampling** is supported.
-2. Rendering of the screenshot is currently not optimised. To experience the true speed of JAX / Flax, tick 'just output raw text'.
+Note: rendering of the screenshot is currently not optimised. To experience the true speed of JAX / Flax, tick 'just output raw text'.
+
+Tips:
+- Do NOT talk to BLOOM as an entity, it's not a chatbot but a webpage/blog/article completion model.
+- For the best results: MIMIC a few sentences of a webpage similar to the content you want to generate.
+Start a paragraph as if YOU were writing a blog, webpage, math post, coding article and BLOOM will generate a coherent follow-up. Longer prompts usually give more interesting results.
+Options:
+- sampling: imaginative completions (may be not super accurate e.g. math/history)
+- greedy: accurate completions (may be more boring or have repetitions)
 """
 
 API_URL = os.getenv("API_URL")
