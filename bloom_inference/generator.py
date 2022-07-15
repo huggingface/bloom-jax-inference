@@ -98,12 +98,12 @@ class Generator:
         self.tokenizer.padding_side = "left"
 
         def greedy_generate(params, input_ids, attention_mask):
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=False, num_beams=1, max_length=self.max_len).sequences
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=False, num_beams=1).sequences
             return output_ids
 
         def sample_generate(params, input_ids, attention_mask):
             # TODO: top_k sampling, set to 0?
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9, max_length=self.max_len).sequences
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9).sequences
             return output_ids
 
         self.p_greedy_generate = self.partitioner.partition(
@@ -125,7 +125,9 @@ class Generator:
             return self.gen(prompts, self.p_greedy_generate)
 
     def gen(self, prompts, gen_fn):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=self.max_input_len, pad_to_multiple_of=self.max_input_len)
+        inputs = self.tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=256, pad_to_multiple_of=128)
+        max_length = inputs.input_ids.shape[-1] + 64
+        self.model.config.max_length = max_length
         # This will auto-magically run in mesh context
         gen_ids = gen_fn(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
 

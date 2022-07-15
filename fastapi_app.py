@@ -13,6 +13,7 @@ region = "us-east1-d"
 ckpt = "bigscience/bloom"
 t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
+# IGNORED
 max_len = 128
 max_input_len = 64
 
