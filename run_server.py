@@ -11,8 +11,8 @@ from bloom_inference.tpu_manager import TPUManager
 from flask import Flask, jsonify, make_response, request
 
 
-BATCH_SIZE = 8
-QUEUE_SIZE = 4
+BATCH_SIZE = 1
+QUEUE_SIZE = 32
 
 MAX_NEW_TOKENS = 64
 MAX_INPUT_LEN = 64
@@ -95,7 +95,7 @@ def server_loop(q):
 
             start = time.time()
             # TODO: handle `do_sample`
-            results = t.generate(all_prompts, do_sample=True)
+            results = t.generate(all_prompts, do_sample=do_sample)
             print(f"Generations completed in {time.time() - start:.06}s")
 
             for result, response_queue in zip(results, all_queues):

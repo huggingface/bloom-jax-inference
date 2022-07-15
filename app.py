@@ -35,26 +35,26 @@ Options:
 API_URL = os.getenv("API_URL")
 
 examples = [
-
     ['To do a "farduddle" means to jump up and down really fast. An example of a sentence that uses the word farduddle is:',
-        64, "sampling", True],
+        64, "sampling", False],
+    ['Recipe for a quick coconut pasta:', 64, "greedy", False],
     ['A poem about the beauty of science by Alfred Edgar Brittle\nTitle: The Magic Craft\nIn the old times', 64,
-     "sampling", True],
-    ['استخراج العدد العاملي في لغة بايثون:', 64, "greedy", True],
-    ["Pour déguster un ortolan, il faut tout d'abord", 64, "sampling", True],
+     "sampling", False],
+    ['استخراج العدد العاملي في لغة بايثون:', 64, "greedy", False],
+    ["Pour déguster un ortolan, il faut tout d'abord", 64, "sampling", False],
     ['Traduce español de España a español de Argentina\nEl coche es rojo - el auto es rojo\nEl ordenador es nuevo - la computadora es nueva\nel boligrafo es negro -',
-        64, "sampling", True],
+        64, "sampling", False],
     ['Estos ejemplos quitan vocales de las palabras\nEjemplos:\nhola - hl\nmanzana - mnzn\npapas - pps\nalacran - lcrn\npapa -',
-        64, "sampling", True],
-    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "greedy", True],
-    ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", True],
-    ["Python - code to compute the factorial of a number:", 64, "greedy", True],
+        64, "sampling", False],
+    ["Question: If I put cheese into the fridge, will it melt?\nAnswer:", 64, "greedy", False],
+    ["Math exercise - answers:\n34+10=44\n54+20=", 64, "sampling", False],
+    ["Python - code to compute the factorial of a number:", 64, "greedy", False],
     ["Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother?\nAnswer:",
-        64, "sampling", True],
+        64, "sampling", False],
     ["spelling test answers.\nWhat are the letters in « language »?\nAnswer: l-a-n-g-u-a-g-e\nWhat are the letters in « Romanian »?\nAnswer:",
-        64, "sampling", True],
+        64, "sampling", False],
     ['A "whatpu" is a small, furry animal native to Tanzania. An example of a sentence that uses the word whatpu is:',
-     64, "sampling", True],
+     64, "sampling", False],
 ]
 
 
@@ -121,7 +121,7 @@ gr.Interface(
         gr.inputs.Textbox(label="Input"),
         gr.inputs.Radio([64], default=64, label="Tokens to generate"),
         gr.inputs.Radio(["sampling", "greedy"], label="Sample or greedy", default="sampling"),
-        gr.Checkbox(label="Just output raw text", value=True),
+        gr.Checkbox(label="Just output raw text", value=False),
     ],
     ["image", "text"],
     examples=examples,
