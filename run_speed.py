@@ -19,8 +19,9 @@ from transformers import AutoTokenizer
 parser = argparse.ArgumentParser()
 parser.add_argument("--ckpt", type=str, default="bigscience/bloom")
 parser.add_argument("--t5x_path", type=str, default="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0")
-parser.add_argument("--max_len", type=int, default=128)
-parser.add_argument("--input_len", type=int, default=64)
+parser.add_argument("--max_len", type=int, default=256)
+parser.add_argument("--input_len", type=int, default=128)
+parser.add_argument("--batch_size", type=int, default=8)
 args = parser.parse_args()
 
 
@@ -28,6 +29,7 @@ ckpt = args.ckpt
 path = args.t5x_path
 max_len = args.max_len
 input_len = args.input_len
+batch_size = args.batch_size
 
 config = BloomConfig.from_pretrained(ckpt)
 model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
@@ -85,7 +87,7 @@ state_shapes = jax.eval_shape(init_state)
 model_parallel_submesh = (1, 2, 4, 1)
 partitioner = PjitPartitioner(
     model_parallel_submesh=model_parallel_submesh,
-    logical_axis_rules=logical_axis_rules_full
+    logical_axis_rules=logical_axis_rules_palm
 )
 mesh_axes = partitioner.get_mesh_axes(state_shapes)
 params_spec = mesh_axes.params
@@ -111,28 +113,83 @@ p_generate = partitioner.partition(
 # setup for generation
 tokenizer.padding_side = "left"
 model.config.max_length = max_len
+model.config.min_length = max_len
 model.config.num_beams = 1
 model.config.do_sample = True
 model.config.top_p = 0.9
 
 
-prompts = ["This is cool "] * 8
-inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
 
-# This will auto-magically run in mesh context
-head_print("Compiling generate")
-start = time.time()
-gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)
-if jax.process_index() == 0:
-    print("Compilation time:", time.time() - start)
+def benchmark(bs, input_len, max_len):
+    model.config.max_length = max_len
+    model.config.min_length = max_len
+
+    prompts = ["Let's try a new text"] * bs
+    inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
+
+    # =====================================================================
+    # This will auto-magically run in mesh context
+    head_print("Compiling generate")
+    start = time.time()
+    gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+    generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)
+    head_print(f"BS={bs} input_len={input_len} max_len={max_len} Compilation time:", time.time() - start)
+    # =====================================================================
 
 
-start = time.time()
-gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
-generated_text = tokenizer.batch_decode(gen_ids.local_shards[0].data, skip_special_tokens=False)
-if jax.process_index() == 0:
-    print("Generation time:", time.time() - start)
+    # =====================================================================
 
-if jax.process_index() == 0:
-    print(generated_text)
+    prompts = [f"Let's try some other text which is a bit longer {input_len}"] * bs
+    inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
+
+    start = time.time()
+    gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+    generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)
+    head_print(f"BS={bs} input_len={input_len} max_len={max_len} Generation time:", time.time() - start)
+    head_print("====================================================")
+    # =====================================================================
+
+# 64/64
+# benchmark(bs=64, input_len=64, max_len=128)
+benchmark(bs=32, input_len=64, max_len=128)
+benchmark(bs=16, input_len=64, max_len=128)
+benchmark(bs=8, input_len=64, max_len=128)
+benchmark(bs=4, input_len=64, max_len=128)
+benchmark(bs=2, input_len=64, max_len=128)
+benchmark(bs=1, input_len=64, max_len=128)
+
+
+# Generation time: 25.073523998260498
+
+# Compilation time: 16.685150384902954
+# Generation time: 2.736557722091675
+
+### 128 -> 256
+# Compilation time: 21.246875762939453
+# Generation time: 6.962492227554321
+
+
+# Compiling generate
+# BS=32 input_len=64 max_len=128 Compilation time: 76.30435061454773
+# BS=32 input_len=64 max_len=128 Generation time: 7.012312173843384
+# ====================================================
+# Compiling generate
+# BS=16 input_len=64 max_len=128 Compilation time: 18.994248390197754
+# BS=16 input_len=64 max_len=128 Generation time: 4.16681170463562
+# ====================================================
+# Compiling generate
+# BS=8 input_len=64 max_len=128 Compilation time: 16.957380056381226
+# BS=8 input_len=64 max_len=128 Generation time: 2.7345969676971436
+# ====================================================
+# Compiling generate
+# BS=4 input_len=64 max_len=128 Compilation time: 70.61075520515442
+# BS=4 input_len=64 max_len=128 Generation time: 2.2682857513427734
+# ====================================================
+# Compiling generate
+# BS=2 input_len=64 max_len=128 Compilation time: 67.68023204803467
+# BS=2 input_len=64 max_len=128 Generation time: 1.9246459007263184
+# ====================================================
+# Compiling generate
+# BS=1 input_len=64 max_len=128 Compilation time: 66.19156551361084
+# BS=1 input_len=64 max_len=128 Generation time: 1.7932021617889404
+# ====================================================
