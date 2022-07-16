@@ -23,7 +23,7 @@ def setup():
     conns = get_connection(tpu_name, region)
     print(len(conns))
     address='10.130.0.10:8080'
-    head_info = ray.init(include_dashboard=False, address="auto")
+    # head_info = ray.init(include_dashboard=False, address="auto")
     # object_store_memory=10**9, 
 
     # start ray CPU<->TPU on all hosts
@@ -42,43 +42,43 @@ def init_manager():
     )
     return t
 
-def benchmark_generate(tpu_manager, inputs, bs):
-    print(f"benchmarking for BS = {bs}")
-    # benchmark compile step
-    start = time.time()
-    tpu_manager.generate(inputs)
-    print(f"Generations compiled in {time.time() - start:.06}s")
+# def benchmark_generate(tpu_manager, inputs, bs):
+#     print(f"benchmarking for BS = {bs}")
+#     # benchmark compile step
+#     start = time.time()
+#     tpu_manager.generate(inputs)
+#     print(f"Generations compiled in {time.time() - start:.06}s")
 
-    # benchmark generate
-    start = time.time()
-    out = tpu_manager.generate(inputs)
-    with open(f'result-{bs}.json', 'w') as fp:
-        json.dump(out[0], fp)
-    print(f"Generations completed in {time.time() - start:.06}s")
-    print("=========================================")
-
-
-setup()
-tpu_manager = init_manager()
-
-p = [
-    "Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother? Answer:",
-    "spelling test answers. What are the letters in « language »? Answer: l-a-n-g-u-a-g-e What are the letters in « Romanian »? Answer:",
-    "Math exercise - answers: 34+10=44 54+20=",
-    "A poem about the beauty of science by Alfred Edgar Brittle Title: The Magic Craft In the old times"
-]
+#     # benchmark generate
+#     start = time.time()
+#     out = tpu_manager.generate(inputs)
+#     with open(f'result-{bs}.json', 'w') as fp:
+#         json.dump(out[0], fp)
+#     print(f"Generations completed in {time.time() - start:.06}s")
+#     print("=========================================")
 
 
-# inputs = {"prompts": p[0], "max_new_tokens": 64, "gen_method": "sampling"}
+# setup()
+# tpu_manager = init_manager()
+
+# p = [
+#     "Question: Where does the Greek Goddess Persephone spend half of the year when she is not with her mother? Answer:",
+#     "spelling test answers. What are the letters in « language »? Answer: l-a-n-g-u-a-g-e What are the letters in « Romanian »? Answer:",
+#     "Math exercise - answers: 34+10=44 54+20=",
+#     "A poem about the beauty of science by Alfred Edgar Brittle Title: The Magic Craft In the old times"
+# ]
+
+
+# inputs = {"prompt": p[0], "max_new_tokens": 64, "gen_method": "sampling"}
 # benchmark_generate(tpu_manager, inputs, 1)
 
-# inputs = {"prompts": p[:2], "max_new_tokens": 64, "gen_method": "sampling"}
+# inputs = {"prompt": p[:2], "max_new_tokens": 64, "gen_method": "sampling"}
 # benchmark_generate(tpu_manager, inputs, 2)
 
-# inputs = {"prompts": p, "max_new_tokens": 64, "gen_method": "sampling"}
+# inputs = {"prompt": p, "max_new_tokens": 64, "gen_method": "sampling"}
 # benchmark_generate(tpu_manager, inputs, 4)
 
-# inputs = {"prompts": p * 2, "max_new_tokens": 64, "gen_method": "sampling"}
+# inputs = {"prompt": p * 2, "max_new_tokens": 64, "gen_method": "sampling"}
 # benchmark_generate(tpu_manager, inputs, 8)
 
 # inputs = {"prompts": "one" * 64, "max_new_tokens": 64, "gen_method": "sampling"}

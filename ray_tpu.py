@@ -59,8 +59,11 @@ def start_ray(conn, address):
         conn.put(i, "bloom-jax-inference/bloom_inference/")
 
     # copy CPU/TPU manager files into bloom_inference/bloom_inference
-    for i in glob.glob("scripts/*.sh"):
-        conn.put(i, "bloom-jax-inferenc/scripts/")
+    # for i in glob.glob("scripts/*.sh"):
+    #     conn.put(i, "bloom-jax-inference/scripts/")
+    
+    for i in glob.glob("*.sh"):
+        conn.put(i, "bloom-jax-inference/")
 
     # copy modeling files into bloom_inference/bloom_inference/modeling_bloom
     for i in glob.glob("bloom_inference/modeling_bloom/*.py"):
@@ -74,7 +77,8 @@ def start_ray(conn, address):
     conn.put("key.json", "bloom-jax-inference/")
 
     # transfer start-up script from CPU -> hosts and give permissions
-    conn.sudo("chmod +x bloom-jax-inferenc/scripts/ray_tpu.sh", hide=True)
+    conn.put("scripts/ray_tpu.sh", "ray_tpu.sh")
+    conn.sudo("chmod +x ray_tpu.sh", hide=True)
 
     try:
         conn.run("ray stop -f", hide=True)
@@ -84,6 +88,6 @@ def start_ray(conn, address):
     time.sleep(1)
 
     # run start-up script
-    out = conn.run(f"bash /tmp/ray-tpu.sh {address}", hide=False)
+    out = conn.run(f"bash ray_tpu.sh {address}", hide=False)
     # display result
     print(out)

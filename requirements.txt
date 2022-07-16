@@ -5,4 +5,5 @@ dataclasses
 func_timeout
 numpy
 requests
-numpy
+fastapi
+"uvicorn[standard]"

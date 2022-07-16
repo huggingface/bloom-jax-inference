@@ -63,7 +63,7 @@ class TPUManager:
 
 
     # @func_set_timeout(600)
-    def generate(self, inputs):
+    def generate(self, inputs, do_sample):
         # TODO: split context (prompts) if len(context) != 4
         #context = np.array_split(context, len(self.nodes), axis=0)
         res = []
@@ -71,6 +71,6 @@ class TPUManager:
         # for n, inp in zip(self.nodes, inputs):
         #     res.append(n.generate.remote(inp))
         for n in self.nodes:
-            res.append(n.generate.remote(inputs))
+            res.append(n.generate.remote(inputs, do_sample))
 
         return [i for i in ray.get(res)]

@@ -1,3 +1,5 @@
+import os
+os.environ["TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD"] = "34359738368"
 import argparse
 import time
 
@@ -17,8 +19,8 @@ from transformers import AutoTokenizer
 parser = argparse.ArgumentParser()
 parser.add_argument("--ckpt", type=str, default="bigscience/bloom")
 parser.add_argument("--t5x_path", type=str, default="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x/checkpoint_0")
-parser.add_argument("--max_len", type=int, default=100)
-parser.add_argument("--input_len", type=int, default=10)
+parser.add_argument("--max_len", type=int, default=128)
+parser.add_argument("--input_len", type=int, default=64)
 args = parser.parse_args()
 
 
@@ -31,10 +33,14 @@ config = BloomConfig.from_pretrained(ckpt)
 model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 tokenizer = AutoTokenizer.from_pretrained("bigscience/bloom-350m", use_fast=False)
 
+def head_print(*args, **kwargs):
+    if jax.process_index() == 0:
+        print(*args, **kwargs)
+
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
-    ('batch', 'data'),
+    ('batch', None),
     ('mlp', 'model'),
     ('heads', 'model'),
     ('vocab', 'model'),
@@ -49,6 +55,18 @@ logical_axis_rules_full = [
     ('layers', None),
     ('stack', None),
     ('mlp_activations', None),
+]
+
+logical_axis_rules_palm = [
+    ('batch', None),
+    ('mlp', 'data'),
+    ('heads', 'data'),
+    ('vocab', 'data'),
+    ('embed', 'model'),
+    ('kv', None),
+    ('length', None),
+    ('layers', None),
+    ('stack', None)
 ]
 
 
@@ -76,7 +94,9 @@ params_spec = mesh_axes.params
 checkpointer = Checkpointer(state_shapes, partitioner, path, use_gda=True, restore_dtype=jnp.bfloat16, save_dtype=jnp.bfloat16)
 
 # load state
+head_print("Loading checkpoint")
 loaded_state = checkpointer.restore(path=path)
+head_print("Loading complete")
 
 def generate(params, input_ids, attention_mask):
     output_ids = model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
@@ -84,8 +104,8 @@ def generate(params, input_ids, attention_mask):
 
 p_generate = partitioner.partition(
     generate,
-    in_axis_resources=(params_spec, P("data"), P("data")),
-    out_axis_resources=P("data")
+    in_axis_resources=(params_spec, None, None),
+    out_axis_resources=None
 )
 
 # setup for generation
@@ -96,10 +116,11 @@ model.config.do_sample = True
 model.config.top_p = 0.9
 
 
-prompts = ["This is cool "] * 4
+prompts = ["This is cool "] * 8
 inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
 
 # This will auto-magically run in mesh context
+head_print("Compiling generate")
 start = time.time()
 gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
 generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)

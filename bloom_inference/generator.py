@@ -1,6 +1,12 @@
+import os
+# os.environ["LIBTPU_INIT_ARGS"]="--xla_tpu_spmd_rng_bit_generator_unsafe=true"
+
+import random
 import warnings
 
 import jax
+# jax.config.update('jax_default_prng_impl', 'rbg') 
+
 import jax.numpy as jnp
 from jax.experimental import PartitionSpec as P
 from jax.experimental.compilation_cache import compilation_cache as cc
@@ -8,6 +14,9 @@ from jax.experimental.compilation_cache import compilation_cache as cc
 from t5x.partitioning import PjitPartitioner
 from t5x.train_state import InferenceState
 from t5x.checkpoints import Checkpointer
+from t5x.utils import set_hardware_rng_ops
+
+# set_hardware_rng_ops()
 
 from transformers import AutoTokenizer
 
@@ -30,7 +39,7 @@ def head_print(*args, **kwargs):
 
 # 2D parameter and activation partitioning
 logical_axis_rules_full = [
-    ('batch', 'data'),
+    ('batch', None),
     ('mlp', 'model'),
     ('heads', 'model'),
     ('vocab', 'model'),
@@ -45,6 +54,19 @@ logical_axis_rules_full = [
     ('layers', None),
     ('stack', None),
     ('mlp_activations', None),
+]
+
+logical_axis_rules_palm = [
+    ('batch', None),
+    ('mlp', 'data'),
+    ('heads', 'data'),
+    ('vocab', 'data'),
+    ('embed', 'model'),
+    ('kv', None),
+    # ('layer_norm_scale', 'model'),
+    ('length', None),
+    ('layers', None),
+    ('stack', None)
 ]
 
 
@@ -64,7 +86,7 @@ class Generator:
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
 
-        config = BloomConfig.from_pretrained(ckpt, max_length=max_len, do_sample=True, num_beams=1, top_p=0.9)
+        config = BloomConfig.from_pretrained(ckpt)
         self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
 
         def init_state():
@@ -78,7 +100,7 @@ class Generator:
         state_shapes = jax.eval_shape(init_state)
         self.partitioner = PjitPartitioner(
             model_parallel_submesh=self.model_parallel_submesh,
-            logical_axis_rules=logical_axis_rules_full
+            logical_axis_rules=logical_axis_rules_palm
         )
         self.params_spec = self.partitioner.get_mesh_axes(state_shapes).params
 
@@ -98,21 +120,56 @@ class Generator:
         self.tokenizer = AutoTokenizer.from_pretrained(self.ckpt)
         self.tokenizer.padding_side = "left"
 
-        def generate(params, input_ids, attention_mask):
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params).sequences
+        def greedy_generate(params, input_ids, attention_mask):
+            output_ids = self.model.generate(input_ids,
+                attention_mask=attention_mask, params=params, do_sample=False, num_beams=1).sequences
+            return output_ids
+        
+        def sample_generate(params, input_ids, attention_mask):
+            output_ids = self.model.generate(input_ids,
+                attention_mask=attention_mask,
+                params=params,
+                do_sample=True,
+                num_beams=1,
+                top_p=0.9,
+            ).sequences
             return output_ids
 
-        self.p_generate = self.partitioner.partition(
-            generate,
-            in_axis_resources=(self.params_spec, P("data"), P("data")),
-            out_axis_resources=P("data")
+        self.p_greedy_generate = self.partitioner.partition(
+            greedy_generate,
+            in_axis_resources=(self.params_spec, None, None),
+            out_axis_resources=None
         )
 
-    def generate(self, prompts):
-        inputs = self.tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True,
-                                max_length=self.max_input_len)
-        # This will auto-magically run in mesh context
-        gen_ids = self.p_generate(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+        self.p_sample_generate = self.partitioner.partition(
+            sample_generate,
+            in_axis_resources=(self.params_spec, None, None),
+            out_axis_resources=None
+        )
 
-        generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
-        return generated_text
+    def generate(self, inputs, do_sample):
+        if do_sample:
+            return self.gen(inputs, self.p_sample_generate)
+        else:
+            return self.gen(inputs, self.p_greedy_generate)
+
+    def gen(self, prompts, gen_fn):
+        try:
+            MAX_NEW_TOKENS = 64
+            INPUT_LENGTH = 128
+            
+            inputs = self.tokenizer(prompts, return_tensors="jax", truncation=True, max_length=INPUT_LENGTH, pad_to_multiple_of=INPUT_LENGTH, padding=True)
+            max_length = inputs.input_ids.shape[-1] + MAX_NEW_TOKENS
+            head_print(f"Input ids are {inputs.input_ids.shape}")
+
+            self.model.config.max_length = max_length
+            # This will auto-magically run in mesh context
+            gen_ids = gen_fn(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+
+            head_print(f"Generated size was {gen_ids.shape}")
+
+            generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
+            return generated_text
+        except Exception as e:
+            head_print(e)
+            return {"error": "something went wrong"}

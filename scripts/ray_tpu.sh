@@ -20,6 +20,7 @@ then
   source ~/venv/bin/activate
   # for now, reinstall bloom-jax-inference everytime
   pip install -e bloom-jax-inference/
+  # pip install -U tbp-nightly
 else
   echo "creating venv"
   # get application updates, 'yes' to all
@@ -52,5 +53,4 @@ fi
 
 sudo pkill python* | true
 # TODO: this should be it's own command.
-TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1 --resources="{\"tpu\": 1}"
-# TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1
+# TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD=34359738368 ray start --address=$1 --resources="{\"tpu\": 1}"
