@@ -43,14 +43,14 @@ def run_app(q):
 
 def server_loop(q):
     print("Starting server loop")
-    tpu_name = "dalle-pod"
-    region = "us-east1-d"
+    tpu_name = "patrick-tpu-v3-32"
+    region = "europe-west4-a"
 
     ckpt = "bigscience/bloom"
 
     t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
-    model_parallel_submesh = (1, 8, 1, 2)
+    num_mp_partitions = 4
 
     conns = get_connection(tpu_name, region)
 
@@ -67,7 +67,7 @@ def server_loop(q):
             t5x_path=t5x_path,
             max_len=MAX_LEN,
             max_input_len=MAX_INPUT_LEN,
-            model_parallel_submesh=model_parallel_submesh,
+            num_mp_partitions=num_mp_partitions,
         )
 
         # benchmark compile step

@@ -12,6 +12,7 @@ class TPUManager:
         max_len=256,
         max_input_len=64,
         model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
+        num_mp_partitions=None,
 
     ):
         # needs a valid ray cluster to start
@@ -24,6 +25,7 @@ class TPUManager:
         self.max_len = max_len
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
+        self.num_mp_partitions = num_mp_partitions
 
         self.nodes = []
         self.node_count = node_count
@@ -37,6 +39,7 @@ class TPUManager:
                 max_len,
                 max_input_len,
                 model_parallel_submesh,
+                num_mp_partitions,
             )
             self.nodes.append(worker)
 

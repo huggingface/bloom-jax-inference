@@ -12,12 +12,14 @@ class TPUHostWorker(object):
         max_len=256,
         max_input_len=64,
         model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
+        num_mp_partitions=None,
     ):
         self.ckpt = ckpt
         self.path = t5x_path
         self.max_len = max_len
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
+        self.num_mp_partitions = num_mp_partitions
 
         self.input_q = Queue(maxsize=1)
         self.output_q = Queue(maxsize=1)
@@ -36,6 +38,7 @@ class TPUHostWorker(object):
         head_print("Loading model")
         generator = Generator(
             model_parallel_submesh=self.model_parallel_submesh,
+            num_mp_partitions=self.num_mp_partitions,
             ckpt=self.ckpt,
             t5x_path=self.path,
             max_len=self.max_len,

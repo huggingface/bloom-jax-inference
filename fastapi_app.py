@@ -7,17 +7,17 @@ import ray
 from ray_tpu import get_connection, start_ray
 from bloom_inference.tpu_manager import TPUManager
 
-tpu_name = "dalle-pod"
-region = "us-east1-d"
+tpu_name = "patrick-tpu-v3-32"
+region = "europe-west4-a"
 
 ckpt = "bigscience/bloom"
 t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
-# IGNORED
+# IGNORED -> we're hacky and just set these in the `generator.py` file...
 max_len = 128
 max_input_len = 64
 
-model_parallel_submesh = (1, 8, 1, 2)  # for v3-256
+num_mp_partitions = 4
 
 # get Python list of TPU host
 conns = get_connection(tpu_name, region)
@@ -37,7 +37,7 @@ tpu_manager = TPUManager(
         t5x_path=t5x_path,
         max_len=max_len,
         max_input_len=max_input_len,
-        model_parallel_submesh=model_parallel_submesh,
+        num_mp_partitions=num_mp_partitions,
 )
 
 print("Compiling greedy...")

@@ -1,4 +1,6 @@
 import warnings
+import os
+os.environ["TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD"] = "3596615690"
 
 import jax
 import jax.numpy as jnp
@@ -47,11 +49,26 @@ logical_axis_rules_full = [
     ('mlp_activations', None),
 ]
 
+# v3-32: standard rules suffer on v3-32, try PALMs
+logical_axis_rules_palm = [
+    ('batch', None),
+    ('mlp', 'data'),
+    ('heads', 'data'),
+    ('vocab', 'data'),
+    ('embed', 'model'),
+    ('kv', None),
+    # ('layer_norm_scale', 'model'),
+    ('length', None),
+    ('layers', None),
+    ('stack', None)
+]
+
 
 class Generator:
     def __init__(
             self,
             model_parallel_submesh=(1, 8, 1, 2),  # for v3-256
+            num_mp_partitions=None,
             ckpt="bigscience/bloom",
             t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0",
             max_len=256,
@@ -62,6 +79,7 @@ class Generator:
         self.max_len = max_len
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
+        self.num_mp_partitions = num_mp_partitions
 
         config = BloomConfig.from_pretrained(self.ckpt)
         self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
@@ -75,10 +93,18 @@ class Generator:
             return InferenceState.create(initial_vars)
 
         state_shapes = jax.eval_shape(init_state)
-        self.partitioner = PjitPartitioner(
-            model_parallel_submesh=self.model_parallel_submesh,
-            logical_axis_rules=logical_axis_rules_full
-        )
+
+        # v3-32: set num_partitions as opposed to submesh
+        if self.num_mp_partitions:
+            self.partitioner = PjitPartitioner(
+                num_partitions=self.num_mp_partitions,
+                logical_axis_rules=logical_axis_rules_palm
+            )
+        else:
+            self.partitioner = PjitPartitioner(
+                model_parallel_submesh=self.model_parallel_submesh,
+                logical_axis_rules=logical_axis_rules_palm
+            )
         self.params_spec = self.partitioner.get_mesh_axes(state_shapes).params
 
         # Instantiate checkpointer
@@ -106,16 +132,18 @@ class Generator:
             output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9).sequences
             return output_ids
 
+        # v3-32: Partition spec for DP
         self.p_greedy_generate = self.partitioner.partition(
             greedy_generate,
-            in_axis_resources=(self.params_spec, None, None),
-            out_axis_resources=None,
+            in_axis_resources=(self.params_spec, P("data"), P("data")),
+            out_axis_resources=P("data"),
         )
 
+        # v3-32: Partition spec for DP
         self.p_sample_generate = self.partitioner.partition(
             sample_generate,
-            in_axis_resources=(self.params_spec, None, None),
-            out_axis_resources=None,
+            in_axis_resources=(self.params_spec, P("data"), P("data")),
+            out_axis_resources=P("data"),
         )
 
     def generate(self, prompts, do_sample):
@@ -126,6 +154,7 @@ class Generator:
 
     def gen(self, prompts, gen_fn):
         inputs = self.tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=256, pad_to_multiple_of=128)
+        # Here's the hackiness with max_new_tokens
         max_length = inputs.input_ids.shape[-1] + 64
         self.model.config.max_length = max_length
         # This will auto-magically run in mesh context
@@ -133,3 +162,9 @@ class Generator:
 
         generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
         return generated_text
+
+generator = Generator(num_mp_partitions=4)
+
+generator.load_model_and_params()
+
+generator.generate(4 * ['the cat sat on the mat'], do_sample=True)
