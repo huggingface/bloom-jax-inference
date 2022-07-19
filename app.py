@@ -78,7 +78,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
     )
 
     if raw_text:
-        return None, data[0]['generated_text'][0]
+        return None, data[0]['generated_text']
 
     width, height = 3326, 3326
     assets_path = "assets"
@@ -97,7 +97,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
     }
 
     # TODO: fix screenshot
-    new_string = data[0]['generated_text'][0].split(input_sentence, 1)[1]
+    new_string = data[0]['generated_text'].split(input_sentence, 1)[1]
 
     _, img = main(
         input_sentence,
@@ -112,7 +112,7 @@ def inference(input_sentence, max_length, sample_or_greedy, raw_text=True):
         init_font_size=142,
         right_align=False,
     )
-    return img, data[0]['generated_text'][0]
+    return img, data[0]['generated_text']
 
 
 gr.Interface(
