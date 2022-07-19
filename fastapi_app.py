@@ -61,5 +61,5 @@ async def generate(request: Request):
     inputs = content.get("inputs", "Hello my name is BLOOM")
     do_sample = content.get("do_sample", "True")
     generation = tpu_manager.generate(inputs, do_sample)[0]
-    out = [{"generated_text": generation}]
+    out = [{"generated_text": generation[0]}]
     return out
