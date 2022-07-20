@@ -14,13 +14,12 @@ ckpt = "bigscience/bloom"
 
 t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
-batch_size = 1
+batch_size = 2
 
-max_new_tokens = 64
-max_input_len = 64
+max_new_tokens = 4
+max_input_len = 4
 max_len = max_input_len + max_new_tokens
 
-model_parallel_submesh = (4, 4, 1, 2)
 num_mp_partitions = 4
 
 # get Python list of TPU hosts
@@ -40,7 +39,6 @@ t = TPUManager(
     t5x_path=t5x_path,
     max_len=max_len,
     max_input_len=max_input_len,
-    model_parallel_submesh=model_parallel_submesh,
     num_mp_partitions=4,
 )
 

@@ -13,9 +13,8 @@ region = "europe-west4-a"
 ckpt = "bigscience/bloom"
 t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
-# IGNORED -> we're hacky and just set these in the `generator.py` file...
-max_len = 128
-max_input_len = 64
+max_len = 32
+max_input_len = 16
 
 num_mp_partitions = 4
 
@@ -41,7 +40,7 @@ tpu_manager = TPUManager(
 )
 
 print("Compiling greedy...")
-inputs = "up" * 128
+inputs = "up" * 16
 tpu_manager.generate(inputs, do_sample=False)
 
 print("Compiling sampling...")
