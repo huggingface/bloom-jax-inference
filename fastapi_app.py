@@ -7,7 +7,7 @@ import ray
 from ray_tpu import get_connection, start_ray
 from bloom_inference.tpu_manager import TPUManager
 
-tpu_name = "patrick-tpu-v3-32"
+tpu_name = "sanchit-tpu-v3-32"
 region = "europe-west4-a"
 
 ckpt = "bigscience/bloom"
