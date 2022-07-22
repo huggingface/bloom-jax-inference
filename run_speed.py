@@ -65,6 +65,8 @@ logical_axis_rules_palm = [
     ('heads', 'data'),
     ('vocab', 'data'),
     ('embed', 'model'),
+    # ('embed', 'data'),
+    # ('joined_kv', 'data'),
     ('kv', None),
     ('length', None),
     ('layers', None),
@@ -80,6 +82,13 @@ def init_state():
     initial_vars = model.module.init(rng, input_ids, attention_mask, return_dict=False)
     return InferenceState.create(initial_vars)
 
+def init_params():
+    input_shape = (1,1)
+    input_ids = jnp.zeros(input_shape, dtype="i4")
+    attention_mask = jnp.ones_like(input_ids)
+    rng = jax.random.PRNGKey(0)
+    return model.module.init(rng, input_ids, attention_mask, return_dict=False)["params"]
+
 
 state_shapes = jax.eval_shape(init_state)
 
@@ -91,6 +100,17 @@ partitioner = PjitPartitioner(
 )
 mesh_axes = partitioner.get_mesh_axes(state_shapes)
 params_spec = mesh_axes.params
+
+
+# p_init = partitioner.partition(
+#     init_params,
+#     in_axis_resources=None,
+#     out_axis_resources=params_spec
+# )
+
+# head_print("init model")
+# loaded_params = p_init()
+# head_print("init complete")
 
 # Instantiate checkpointer
 checkpointer = Checkpointer(state_shapes, partitioner, path, use_gda=True, restore_dtype=jnp.bfloat16, save_dtype=jnp.bfloat16)
@@ -115,17 +135,29 @@ tokenizer.padding_side = "left"
 model.config.max_length = max_len
 model.config.min_length = max_len
 model.config.num_beams = 1
-model.config.do_sample = True
+model.config.do_sample = False
 model.config.top_p = 0.9
 
+
+prompts = [
+    "DeepSpeed is a machine learning framework",
+    "He is working on",
+    "He has a",
+    "He got all",
+    "Everyone is happy and I can",
+    "The new movie that got Oscar this year",
+    "In the far far distance from our galaxy,",
+    "Peace is the only way"
+]
 
 
 def benchmark(bs, input_len, max_len):
     model.config.max_length = max_len
     model.config.min_length = max_len
 
-    prompts = ["Let's try a new text"] * bs
-    inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
+    # prompts = ["Let's try a new text"] * bs
+    prompts *= math.ceil(bs / len(prompts))
+    inputs = tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=input_len)
 
     # =====================================================================
     # This will auto-magically run in mesh context
@@ -139,9 +171,6 @@ def benchmark(bs, input_len, max_len):
 
     # =====================================================================
 
-    prompts = [f"Let's try some other text which is a bit longer {input_len}"] * bs
-    inputs = tokenizer(prompts, return_tensors="jax", padding="max_length", truncation=True, max_length=input_len)
-
     start = time.time()
     gen_ids = p_generate(loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
     generated_text = tokenizer.batch_decode(gen_ids, skip_special_tokens=False)
@@ -150,23 +179,13 @@ def benchmark(bs, input_len, max_len):
     # =====================================================================
 
 # 64/64
-# benchmark(bs=64, input_len=64, max_len=128)
-benchmark(bs=32, input_len=64, max_len=128)
-benchmark(bs=16, input_len=64, max_len=128)
-benchmark(bs=8, input_len=64, max_len=128)
-benchmark(bs=4, input_len=64, max_len=128)
-benchmark(bs=2, input_len=64, max_len=128)
-benchmark(bs=1, input_len=64, max_len=128)
-
-
-# Generation time: 25.073523998260498
-
-# Compilation time: 16.685150384902954
-# Generation time: 2.736557722091675
-
-### 128 -> 256
-# Compilation time: 21.246875762939453
-# Generation time: 6.962492227554321
+# benchmark(bs=64, input_len=32, max_len=32+64)
+# benchmark(bs=32, input_len=64, max_len=128)
+# benchmark(bs=16, input_len=64, max_len=128)
+# benchmark(bs=8, input_len=64, max_len=128)
+# benchmark(bs=4, input_len=64, max_len=128)
+# benchmark(bs=2, input_len=64, max_len=128)
+# benchmark(bs=1, input_len=64, max_len=128)
 
 
 # Compiling generate
@@ -193,3 +212,34 @@ benchmark(bs=1, input_len=64, max_len=128)
 # BS=1 input_len=64 max_len=128 Compilation time: 66.19156551361084
 # BS=1 input_len=64 max_len=128 Generation time: 1.7932021617889404
 # ====================================================
+
+
+
+## V3-256 (1, 8, 1, 2)
+# Compiling generate
+# BS=64 input_len=64 max_len=128 Compilation time: 141.89335203170776
+# BS=64 input_len=64 max_len=128 Generation time: 20.445239782333374
+# ====================================================
+# Compiling generate
+# BS=32 input_len=64 max_len=128 Compilation time: 21.499541997909546
+# BS=32 input_len=64 max_len=128 Generation time: 11.290865182876587
+# ====================================================
+# Compiling generate
+# BS=16 input_len=64 max_len=128 Compilation time: 16.689306020736694
+# BS=16 input_len=64 max_len=128 Generation time: 6.655258655548096
+# ====================================================
+# Compiling generate
+# BS=8 input_len=64 max_len=128 Compilation time: 14.247357606887817
+# BS=8 input_len=64 max_len=128 Generation time: 4.338128089904785
+# ====================================================
+# Compiling generate
+# BS=4 input_len=64 max_len=128 Compilation time: 45.78931999206543
+# BS=4 input_len=64 max_len=128 Generation time: 3.388519525527954
+# ====================================================
+# Compiling generate
+# BS=2 input_len=64 max_len=128 Compilation time: 42.81576061248779
+# BS=2 input_len=64 max_len=128 Generation time: 3.039609909057617
+# ====================================================
+# Compiling generate
+# BS=1 input_len=64 max_len=128 Compilation time: 42.88757038116455
+# BS=1 input_len=64 max_len=128 Generation time: 2.68043
