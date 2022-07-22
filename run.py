@@ -7,7 +7,7 @@ from ray_tpu import get_connection, start_ray
 
 from bloom_inference.tpu_manager import TPUManager 
 
-tpu_name = "patrick-tpu-v3-32"
+tpu_name = "sanchit-tpu-v3-32"
 region = "europe-west4-a"
 
 ckpt = "bigscience/bloom"
@@ -44,12 +44,12 @@ t = TPUManager(
 
 # benchmark compile step
 start = time.time()
-print(t.generate(batch_size*['Recipe for coconut pasta:']))
+print(t.generate(batch_size*['Generate text:']))
 print(f"Generations completed in {time.time() - start:.06}s")
 
 # benchmark generate
 start = time.time()
-print(t.generate(batch_size*['Recipe for coconut pasta:']))
+print(t.generate(batch_size*['Generate text:']))
 print(f"Generations completed in {time.time() - start:.06}s")
 
 

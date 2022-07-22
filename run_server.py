@@ -10,12 +10,13 @@ from queue import Queue, Empty
 from bloom_inference.tpu_manager import TPUManager
 from flask import Flask, jsonify, make_response, request
 
-
+# v3-32: data parallelism requires BATCH_SIZE % 2
 BATCH_SIZE = 2
 QUEUE_SIZE = 32
 
-MAX_NEW_TOKENS = 16
-MAX_INPUT_LEN = 16
+# For testing only generate 4 tokens
+MAX_NEW_TOKENS = 32
+MAX_INPUT_LEN = 32
 MAX_LEN = MAX_INPUT_LEN + MAX_NEW_TOKENS
 
 def run_app(q):
@@ -43,7 +44,7 @@ def run_app(q):
 
 def server_loop(q):
     print("Starting server loop")
-    tpu_name = "patrick-tpu-v3-32"
+    tpu_name = "sanchit-tpu-v3-32"
     region = "europe-west4-a"
 
     ckpt = "bigscience/bloom"
@@ -72,7 +73,7 @@ def server_loop(q):
 
         # benchmark compile step
         start = time.time()
-        print(t.generate(BATCH_SIZE * ['the cat sat on the']))
+        print(t.generate(BATCH_SIZE * ['the cat sat']))
         print(f"Generations compiled in {time.time() - start:.06}s")
 
         while True:

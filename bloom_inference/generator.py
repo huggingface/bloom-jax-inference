@@ -98,12 +98,12 @@ class Generator:
         if self.num_mp_partitions:
             self.partitioner = PjitPartitioner(
                 num_partitions=self.num_mp_partitions,
-                logical_axis_rules=logical_axis_rules_full
+                logical_axis_rules=logical_axis_rules_palm,
             )
         else:
             self.partitioner = PjitPartitioner(
                 model_parallel_submesh=self.model_parallel_submesh,
-                logical_axis_rules=logical_axis_rules_full
+                logical_axis_rules=logical_axis_rules_palm,
             )
         self.params_spec = self.partitioner.get_mesh_axes(state_shapes).params
 
@@ -135,15 +135,15 @@ class Generator:
         # v3-32: Partition spec for DP
         self.p_greedy_generate = self.partitioner.partition(
             greedy_generate,
-            in_axis_resources=(self.params_spec, None, None),
-            out_axis_resources=None,
+            in_axis_resources=(self.params_spec, P('data'), P('data')),
+            out_axis_resources=P('data'),
         )
 
         # v3-32: Partition spec for DP
         self.p_sample_generate = self.partitioner.partition(
             sample_generate,
-            in_axis_resources=(self.params_spec, None, None),
-            out_axis_resources=None,
+            in_axis_resources=(self.params_spec, P('data'), P('data')),
+            out_axis_resources=P('data'),
         )
 
     def generate(self, prompts, do_sample):
@@ -166,4 +166,5 @@ class Generator:
             generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             return generated_text
         except Exception as e:
-            return str(e)
+            head_print(e)
+            return {"error": "something went wrong..."}
