@@ -163,4 +163,4 @@ tags
 *.lock
 
 # DS_Store (MacOS)
-.DS_Store
+.DS_Storekey.json
