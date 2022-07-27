@@ -128,10 +128,9 @@ class Generator:
             output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=False, num_beams=1).sequences
             return output_ids
 
-        def sample_generate(params, input_ids, attention_mask):
+        def sample_generate(params, input_ids, attention_mask, prng_key):
             # TODO: top_k sampling, set to 0?
-            self.key, subkey = jax.random.split(self.key)
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9, prng_key=subkey).sequences
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9, prng_key=prng_key).sequences
             return output_ids
 
         # v3-32: Partition spec for DP
@@ -144,15 +143,15 @@ class Generator:
         # v3-32: Partition spec for DP
         self.p_sample_generate = self.partitioner.partition(
             sample_generate,
-            in_axis_resources=(self.params_spec, P('data'), P('data')),
+            in_axis_resources=(self.params_spec, P('data'), P('data'), None),
             out_axis_resources=P('data'),
         )
 
     def generate(self, prompts, do_sample):
         if do_sample:
             return self.gen(prompts, self.p_sample_generate)
-        else:
-            return self.gen(prompts, self.p_greedy_generate)
+        #else:
+            #return self.gen(prompts, self.p_greedy_generate)
 
     def gen(self, prompts, gen_fn):
         try:
@@ -162,8 +161,9 @@ class Generator:
             max_length = inputs.input_ids.shape[-1] + int(max_new_tokens)
             self.model.config.max_length = max_length
 
+            self.key, subkey = jax.random.split(self.key)
             # This will auto-magically run in mesh context
-            gen_ids = gen_fn(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"])
+            gen_ids = gen_fn(self.loaded_state.params, inputs["input_ids"], inputs["attention_mask"], self.key)
 
             generated_text = self.tokenizer.batch_decode(gen_ids, skip_special_tokens=True)
             return generated_text
