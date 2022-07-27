@@ -1,8 +1,7 @@
 import warnings
-import os
-os.environ["TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD"] = "3596615690"
 
 import jax
+jax.config.update('jax_default_prng_impl', 'unsafe_rbg')
 import jax.numpy as jnp
 from jax.experimental import PartitionSpec as P
 from jax.experimental.compilation_cache import compilation_cache as cc
@@ -117,6 +116,8 @@ class Generator:
             save_dtype=jnp.bfloat16
         )
 
+        self.key = jax.random.PRNGKey(0)
+
     def load_model_and_params(self):
         # load state
         self.loaded_state = self.checkpointer.restore(path=self.path)
@@ -129,7 +130,8 @@ class Generator:
 
         def sample_generate(params, input_ids, attention_mask):
             # TODO: top_k sampling, set to 0?
-            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9).sequences
+            self.key, subkey = jax.random.split(self.key)
+            output_ids = self.model.generate(input_ids, attention_mask=attention_mask, params=params, do_sample=True, num_beams=1, top_p=0.9, prng_key=subkey).sequences
             return output_ids
 
         # v3-32: Partition spec for DP
