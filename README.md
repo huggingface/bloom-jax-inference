@@ -18,10 +18,10 @@ First, create a CPU VM in the **same region** as that of the TPU pod. This is im
    3. CPU platform: Intel Cascade Lake
    4. Boot disk: 256GB balanced persistent disk
 
-SSH into the CPU and set-up a Python environment with the **same Python version** as that of the TPUs. The default TPU Python version is 3.8.10.
+SSH into the CPU and set-up a Python environment with the **same Python version** as that of the TPUs. The default TPU Python version is 3.8.10. You should ensure the Python version of th CPU matches this.
 
 ```
-python3 -m venv /path/to/venv
+python3.8 -m venv /path/to/venv
 ```
 If the above does not work, run the following and then repeat:
    
@@ -57,3 +57,10 @@ Now SSH into one of the workers. This will generate an SSH key:
 ```
 gcloud alpha compute tpus tpu-vm ssh patrick-tpu-v3-32 --zone europe-west4-a --worker 0
 ```
+
+Logout of the TPU worker:
+```
+logout
+```
+
+You should now be back in the CPU host. 
