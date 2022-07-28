@@ -72,6 +72,7 @@ class Generator:
             t5x_path="gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0",
             max_len=256,
             max_input_len=64,
+            unroll=1,
     ):
         self.ckpt = ckpt
         self.path = t5x_path
@@ -79,9 +80,10 @@ class Generator:
         self.max_input_len = max_input_len
         self.model_parallel_submesh = model_parallel_submesh
         self.num_mp_partitions = num_mp_partitions
+        self.unroll = unroll
 
         config = BloomConfig.from_pretrained(self.ckpt)
-        self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True)
+        self.model = FlaxBloomForCausalLM(config, _do_init=False, dtype=jnp.bfloat16, use_scan=True, unroll=self.unroll)
 
         def init_state():
             input_shape = (1, 1)

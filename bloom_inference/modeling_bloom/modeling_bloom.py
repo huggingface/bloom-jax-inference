@@ -425,9 +425,10 @@ class FlaxBloomPreTrainedModel(FlaxPreTrainedModel):
         params_dtype: jnp.dtype = jnp.float32,
         _do_init: bool = True,
         use_scan: bool = False,
+        unroll: int = 1,
         **kwargs,
     ):
-        module = self.module_class(config=config, dtype=dtype, use_scan=use_scan, params_dtype=params_dtype, **kwargs)
+        module = self.module_class(config=config, dtype=dtype, use_scan=use_scan, unroll=unroll, params_dtype=params_dtype, **kwargs)
         super().__init__(config, module, input_shape=input_shape, seed=seed, dtype=dtype, _do_init=_do_init)
 
     def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
@@ -534,6 +535,7 @@ class FlaxBloomBlockCollection(nn.Module):
     dtype: jnp.dtype = jnp.float32
     params_dtype: jnp.dtype = jnp.float32
     use_scan: bool = False
+    unroll: int = 1
 
     # TODO (SG): re-write as a `setup` to conform to Transformers JAX/Flax conventions -> awaiting CG response on G Chat
     @nn.compact
@@ -563,6 +565,7 @@ class FlaxBloomBlockCollection(nn.Module):
                 split_rngs={"params": True, "dropout": True},
                 in_axes=(nn.broadcast, nn.broadcast, 0, nn.broadcast, nn.broadcast),
                 length=self.config.num_hidden_layers,
+                unroll=self.unroll,
             )(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=True, name="FlaxBloomBlockLayers")(
                 hidden_states,
                 alibi,
@@ -603,6 +606,7 @@ class FlaxBloomModule(nn.Module):
     dtype: jnp.dtype = jnp.float32
     params_dtype: jnp.dtype = jnp.float32
     use_scan: bool = False
+    unroll: int = 1
 
     def setup(self):
         # TODO: check initialization correctness
@@ -620,7 +624,7 @@ class FlaxBloomModule(nn.Module):
         self.word_embeddings_layernorm = layers.LayerNorm(epsilon=self.config.layer_norm_epsilon, params_dtype=self.params_dtype)
 
         # transformer layers
-        self.h = FlaxBloomBlockCollection(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=self.use_scan)
+        self.h = FlaxBloomBlockCollection(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=self.use_scan, unroll=self.unroll)
 
         # final layernorm
         self.ln_f = layers.LayerNorm(epsilon=self.config.layer_norm_epsilon, dtype=self.dtype, params_dtype=self.params_dtype)
@@ -684,9 +688,10 @@ class FlaxBloomForCausalLMModule(nn.Module):
     dtype: jnp.dtype = jnp.float32
     params_dtype: jnp.dtype = jnp.float32
     use_scan: bool = False
+    unroll: int = 1
 
     def setup(self):
-        self.transformer = FlaxBloomModule(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=self.use_scan)
+        self.transformer = FlaxBloomModule(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=self.use_scan, unroll=self.unroll)
         self.lm_head = layers.DenseGeneral(
             self.config.vocab_size,
             dtype=jnp.float32,  # Use float32 for stabiliity.
