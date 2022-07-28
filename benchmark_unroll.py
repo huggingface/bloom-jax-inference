@@ -7,16 +7,36 @@ config = BloomConfig.from_pretrained("bigscience/bloom")
 batch_size = 2
 
 head_print("max_inp = 8, max_new = 8, bs = 2")
-for num_unroll in range(1, config.num_hidden_layers + 1):
-    generator = Generator(num_mp_partitions=4, max_len=16, max_input_len=8, unroll=num_unroll)
-    generator.load_model_and_params()
 
-    # compile step
-    generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
+num_unroll = 1
 
-    # benchmark generate
-    start = time.time()
-    generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
-    head_print(f"Unroll {num_unroll}: {time.time() - start:.06}s")
+generator = Generator(num_mp_partitions=4, max_len=16, max_input_len=8, unroll=num_unroll)
 
-    del generator
+generator.load_model_and_params()
+
+# compile step
+generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
+
+# benchmark generate
+start = time.time()
+generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
+head_print(f"Unroll {num_unroll}: {time.time() - start:.06}s")
+
+del generator
+
+
+num_unroll = 2
+
+generator = Generator(num_mp_partitions=4, max_len=16, max_input_len=8, unroll=num_unroll)
+
+generator.load_model_and_params()
+
+# compile step
+generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
+
+# benchmark generate
+start = time.time()
+generator.generate(batch_size*['Recipe for a quick coconut pasta:'], do_sample=True)
+head_print(f"Unroll {num_unroll}: {time.time() - start:.06}s")
+
+del generator
