@@ -565,7 +565,7 @@ class FlaxBloomBlockCollection(nn.Module):
                 split_rngs={"params": True, "dropout": True},
                 in_axes=(nn.broadcast, nn.broadcast, 0, nn.broadcast, nn.broadcast),
                 length=self.config.num_hidden_layers,
-                unroll=8,
+                unroll=self.unroll,
             )(self.config, dtype=self.dtype, params_dtype=self.params_dtype, use_scan=True, name="FlaxBloomBlockLayers")(
                 hidden_states,
                 alibi,
