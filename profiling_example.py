@@ -30,7 +30,6 @@ logical_axis_rules_palm = [
     ('vocab', 'data'),
     ('embed', 'model'),
     ('kv', None),
-    # ('layer_norm_scale', 'model'),
     ('length', None),
     ('layers', None),
     ('stack', None)
@@ -88,14 +87,14 @@ def sample_generate(params, input_ids, attention_mask):
 
 p_forward = partitioner.partition(
     model_forward,
-    in_axis_resources=(params_spec, P("data"), P("data")),
-    out_axis_resources=P("data")
+    in_axis_resources=(params_spec, None, None),
+    out_axis_resources=None,
 )
 
 p_sample_generate = partitioner.partition(
     sample_generate,
-    in_axis_resources=(params_spec, P("data"), P("data")),
-    out_axis_resources=P("data")
+    in_axis_resources=(params_spec, None, None),
+    out_axis_resources=None,
 )
 
 inputs = tokenizer(prompts, return_tensors="jax", padding=True, truncation=True, max_length=max_input_length,
