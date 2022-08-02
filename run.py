@@ -16,8 +16,8 @@ t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 
 batch_size = 2
 
-max_new_tokens = 4
-max_input_len = 4
+max_input_len = 8
+max_new_tokens = 8
 max_len = max_input_len + max_new_tokens
 
 num_mp_partitions = 4
@@ -44,12 +44,12 @@ t = TPUManager(
 
 # benchmark compile step
 start = time.time()
-print(t.generate(batch_size*['Generate text:']))
+print(t.generate(batch_size*['Recipe for quick coconut pasta:']))
 print(f"Generations completed in {time.time() - start:.06}s")
 
 # benchmark generate
 start = time.time()
-print(t.generate(batch_size*['Generate text:']))
+print(t.generate(batch_size*['Recipe for quick coconut pasta:']))
 print(f"Generations completed in {time.time() - start:.06}s")
 
 
