@@ -44,42 +44,56 @@ from .layers import with_sharding_constraint
 
 logger = logging.get_logger(__name__)
 
+def get_slopes(n):
+    def get_slopes_power_of_2(n):
+        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        ratio = start
+        return [start * ratio**i for i in range(n)]
 
-def build_alibi_tensor_flax(attention_mask, n_head, dtype):
-    def get_slopes(n):
-        def get_slopes_power_of_2(n):
-            start = 2 ** (-(2 ** -(math.log2(n) - 3)))
-            ratio = start
-            return [start * ratio**i for i in range(n)]
+    if math.log2(n).is_integer():
+        return get_slopes_power_of_2(n)
+    else:
+        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        return (
+            get_slopes_power_of_2(closest_power_of_2)
+            + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+        )
 
-        if math.log2(n).is_integer():
-            return get_slopes_power_of_2(n)
-        else:
-            closest_power_of_2 = 2 ** math.floor(math.log2(n))
-            return (
-                get_slopes_power_of_2(closest_power_of_2)
-                + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
-            )
+# def build_alibi_tensor_flax(attention_mask, n_head, dtype):
+#     def get_slopes(n):
+#         def get_slopes_power_of_2(n):
+#             start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+#             ratio = start
+#             return [start * ratio**i for i in range(n)]
 
-    # Note: alibi will added to the attention bias that will be applied to the query, key product of attention
-    # => therefore alibi will have to be of shape (batch_size, num_heads, query_length, key_length)
-    # => here we set (batch_size=1, num_heads=n_head, query_length=1, key_length=max_length)
-    # => the query_length dimension will then be broadcasted correctly
-    # This is more or less identical to T5's relative position bias:
-    # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_flax_t5.py#L426
-    # batch_size = 1, n_head = n_head, query_length
-    batch_size, key_length = attention_mask.shape
-    num_heads = n_head
-    query_length = 1
+#         if math.log2(n).is_integer():
+#             return get_slopes_power_of_2(n)
+#         else:
+#             closest_power_of_2 = 2 ** math.floor(math.log2(n))
+#             return (
+#                 get_slopes_power_of_2(closest_power_of_2)
+#                 + get_slopes(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+#             )
 
-    slopes = jnp.array(get_slopes(n_head))[None, :, None, None].astype(dtype)
-    arange_tensor = attention_mask.cumsum(-1, dtype=dtype)[:, None, None, :] - 1
+#     # Note: alibi will added to the attention bias that will be applied to the query, key product of attention
+#     # => therefore alibi will have to be of shape (batch_size, num_heads, query_length, key_length)
+#     # => here we set (batch_size=1, num_heads=n_head, query_length=1, key_length=max_length)
+#     # => the query_length dimension will then be broadcasted correctly
+#     # This is more or less identical to T5's relative position bias:
+#     # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_flax_t5.py#L426
+#     # batch_size = 1, n_head = n_head, query_length
+#     batch_size, key_length = attention_mask.shape
+#     num_heads = n_head
+#     query_length = 1
 
-    slopes_broadcasted = jnp.broadcast_to(slopes, (batch_size, num_heads, query_length, key_length))
-    arange_broadcasted = jnp.broadcast_to(arange_tensor, (batch_size, num_heads, query_length, key_length))
+#     slopes = jnp.array(get_slopes(n_head))[None, :, None, None].astype(dtype)
+#     arange_tensor = attention_mask.cumsum(-1, dtype=dtype)[:, None, None, :] - 1
 
-    alibi = slopes_broadcasted * arange_broadcasted
-    return alibi
+#     slopes_broadcasted = jnp.broadcast_to(slopes, (batch_size, num_heads, query_length, key_length))
+#     arange_broadcasted = jnp.broadcast_to(arange_tensor, (batch_size, num_heads, query_length, key_length))
+
+#     alibi = slopes_broadcasted * arange_broadcasted
+#     return alibi
 
 
 class FlaxBloomAttention(nn.Module):
@@ -179,7 +193,7 @@ class FlaxBloomAttention(nn.Module):
             )
             attention_mask = combine_masks(pad_mask, attention_mask)
         return key, value, attention_mask
-
+    
     def __call__(
         self,
         hidden_states,
@@ -196,7 +210,7 @@ class FlaxBloomAttention(nn.Module):
         # proj q, k, v
         fused_qkv = self.query_key_value(hidden_states)
         query, key, value = jnp.split(fused_qkv, 3, axis=-1)
-        
+
         query = with_sharding_constraint(query, ('batch', 'length', 'heads', 'kv'))
         key = with_sharding_constraint(key, ('batch', 'length', 'heads', 'kv'))
         value = with_sharding_constraint(value, ('batch', 'length', 'heads', 'kv'))
@@ -272,7 +286,7 @@ class BloomGELU(nn.Module):
         self.dtype = jnp.float32
 
     def __call__(self, x):
-        return x * 0.5 * (1.0 + tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
+        return jnp.sqrt(x) * (1.0 + tanh(0.79788456 * x * (1 + 0.044715 * jax.lax.square(x))))
 
 
 class FlaxBloomMLP(nn.Module):
@@ -319,6 +333,7 @@ class FlaxBloomMLP(nn.Module):
         # else:
         #     intermediate_output = self.dense_4h_to_h(hidden_states)
 
+        hidden_states = with_sharding_constraint(hidden_states, ("batch", "length", "mlp"))
         hidden_states = self.dense_4h_to_h(hidden_states)
         return hidden_states
 
@@ -627,6 +642,8 @@ class FlaxBloomModule(nn.Module):
         # TODO: change how gradient checkpointing is done
         self.gradient_checkpointing = False
 
+        self.slopes = jnp.array(get_slopes(self.config.n_head))[None, :, None, None].astype(self.dtype)
+
     def __call__(
         self,
         input_ids=None,
@@ -642,7 +659,12 @@ class FlaxBloomModule(nn.Module):
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
 
         # build alibi depending on `attention_mask`
-        alibi = build_alibi_tensor_flax(attention_mask, self.config.n_head, hidden_states.dtype)
+        # alibi = build_alibi_tensor_flax(attention_mask, self.config.n_head, hidden_states.dtype)
+        batch_size, key_length = attention_mask.shape
+        arange_tensor = attention_mask.cumsum(-1, dtype=self.dtype)[:, None, None, :] - 1
+        slopes_broadcasted = jnp.broadcast_to(self.slopes, (batch_size, self.config.n_head, 1, key_length))
+        arange_broadcasted = jnp.broadcast_to(arange_tensor, (batch_size, self.config.n_head, 1, key_length))
+        alibi = slopes_broadcasted * arange_broadcasted
 
         # TODO: gradient checkpointing
         outputs = self.h(
