@@ -12,11 +12,11 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 if [ -d ~/bloom-jax-inference ];
 then
   pushd ~/bloom-jax-inference
-  git checkout v3-32 | true
+  git checkout v4-64 | true
   git pull | true
   popd
 else
-  git clone -b v3-32 https://github.com/huggingface/bloom-jax-inference
+  git clone -b v4-64 https://github.com/huggingface/bloom-jax-inference
 fi
 
 # gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json

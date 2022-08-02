@@ -18,9 +18,9 @@ ckpt = "bigscience/bloom"
 t5x_path = "gs://bloom-jax-us-central2-b/bloom-176B-scan-t5x-final/checkpoint_0"
 max_new_tokens = 32
 max_input_length = 32
-model_parallel_submesh = (4, 4, 1, 2)
+model_parallel_submesh = (1, 2, 4, 1)
 
-prompts = 4 * ['the cat sat on the mat']
+prompts = 32 * ['the cat sat on the mat']
 
 # 2D parameter and activation partitioning
 logical_axis_rules_palm = [
@@ -50,8 +50,7 @@ def init_state():
 
 state_shapes = jax.eval_shape(init_state)
 partitioner = PjitPartitioner(
-    num_partitions=4,
-    # model_parallel_submesh=model_parallel_submesh,
+    model_parallel_submesh=model_parallel_submesh,
     logical_axis_rules=logical_axis_rules_palm,
 )
 

@@ -1,5 +1,5 @@
-INSTANCE=sanchit-tpu-v3-32
-ZONE=europe-west4-a
+INSTANCE=bloom-tpu-v4-64
+ZONE=us-central2-b
 PROJECT="huggingface-ml"
 
 echo copying $1 to $2
