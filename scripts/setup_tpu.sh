@@ -12,15 +12,15 @@ screen -d -m python -c "import time; time.sleep(999999999)"
 if [ -d ~/bloom-jax-inference ];
 then
   pushd ~/bloom-jax-inference
-  git checkout tpu-v4-64 | true
+  git checkout v3-32 | true
   git pull | true
   popd
 else
-  git clone -b tpu-v4-64 https://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@github.com/huggingface/bloom-jax-inference
+  git clone -b v3-32 https://github.com/huggingface/bloom-jax-inference
 fi
 
-gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
-export GOOGLE_APPLICATION_CREDENTIALS=~/bloom-jax-inference/key.json
+# gcloud auth activate-service-account --key-file ~/bloom-jax-inference/key.json
+# export GOOGLE_APPLICATION_CREDENTIALS=~/bloom-jax-inference/key.json
 
 # check if venv exists
 if [ -f ~/venv/bin/activate ];
